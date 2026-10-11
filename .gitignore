@@ -1,0 +1,28 @@
+# Dependencias y compilados
+node_modules/
+dist/
+coverage/
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# Logs y temporales
+*.log
+npm-debug.log*
+tmp/
+.tmp/
+
+# Sistema operativo / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Exportaciones generadas localmente de diagramas que no se desean versionar
+# (las exportaciones oficiales viven en docs/diagrams/export/)
+docs/diagrams/*.png
+docs/diagrams/*.svg
