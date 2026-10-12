@@ -277,7 +277,7 @@ docker compose -f docker-compose.test.yml run --rm --build backend-test
 docker compose -f docker-compose.test.yml down -v
 ```
 
-Desde el host (requiere Node.js >= 22). El PostgreSQL de pruebas de `docker-compose.test.yml` queda publicado en `127.0.0.1:55432`:
+Desde el host (requiere Node.js >= 22). El PostgreSQL de pruebas de `docker-compose.test.yml` queda publicado en `127.0.0.1:55432` (configurable con `TEST_DB_PORT`; en ese caso exportar tambien `TEST_POSTGRES_PORT` con el mismo valor):
 
 ```powershell
 docker compose -f docker-compose.test.yml up -d db-test
@@ -354,6 +354,7 @@ Verificacion de persistencia realizada: tras `docker compose down` + `docker com
 | El navegador bloquea peticiones desde otro origen | Origen no esta en `CORS_ALLOWED_ORIGINS` | Agregarlo (separado por `\|`) y recrear el gateway |
 | `curl` en PowerShell muestra errores raros | Alias de `Invoke-WebRequest` | Usar `curl.exe` |
 | Las pruebas de integracion fallan con `ECONNREFUSED` | No hay PostgreSQL de pruebas | `docker compose -f docker-compose.test.yml up -d db-test` o usar el runner en Docker |
+| `ports are not available: ... 127.0.0.1:55432 ... forbidden by its access permissions` al levantar `db-test` | Windows reservo ese puerto (ver `netsh interface ipv4 show excludedportrange protocol=tcp`) | Usar otro puerto: `$env:TEST_DB_PORT = "56432"` (PowerShell) o `TEST_DB_PORT=56432` (bash) antes del comando; si se ejecutan las pruebas desde el host, fijar tambien `TEST_POSTGRES_PORT` al mismo valor |
 | `npm ci` falla por version de Node | Node < 22 | Instalar Node 22 LTS o usar solo Docker |
 | Cambios en `.env` no se aplican | Contenedores ya creados | `docker compose up -d` (recrea los afectados) |
 

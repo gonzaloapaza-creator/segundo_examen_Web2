@@ -20,7 +20,7 @@ services:
       POSTGRES_DB: stockguard_test
     # Publicado solo en loopback para poder ejecutar `npm run test:integration` desde el host si se desea.
     ports:
-      - "127.0.0.1:55432:5432"
+      - "127.0.0.1:${TEST_DB_PORT:-55432}:5432"
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
