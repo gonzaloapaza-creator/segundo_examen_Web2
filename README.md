@@ -4,7 +4,7 @@
 **Universidad:** Universidad Catolica Boliviana "San Pablo" - Tecnologias Web 2 (segundo parcial)
 **Fase:** 1 de 2 (backend + Gateway + base de datos). El frontend React/Vite y el informe PDF corresponden a la fase 2.
 
-> Repositorio: _pendiente de publicar_. Al crear el repositorio remoto, reemplazar `<URL_DEL_REPOSITORIO>` en este README (seccion "Clonacion").
+> Repositorio publico: <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> (rama de integracion: `develop`).
 
 ## Indice
 
@@ -100,9 +100,11 @@ No es necesario instalar PostgreSQL ni Node.js en el host.
 ## 5. Clonacion
 
 ```powershell
-git clone <URL_DEL_REPOSITORIO> stockguard
+git clone -b develop https://github.com/gonzaloapaza-creator/segundo_examen_Web2.git stockguard
 cd stockguard
 ```
+
+(`-b develop` apunta a la rama de integracion con el trabajo de la fase 1; `main` quedara en la release de la fase 2.)
 
 ## 6. Configuracion (.env)
 
@@ -373,15 +375,9 @@ Ramas y commits creados en esta fase:
 | `feature/docs` | `docs: add Postman collection and environment with idempotency flows`, `docs: document API and local setup` |
 | `fix/line-endings` | `fix: enforce LF line endings for container scripts and configs` (hallado al probar un clon limpio en Windows) |
 
-**Pendiente para la entrega (requiere al estudiante):** crear el repositorio remoto **publico**, agregar el remoto y publicar las ramas:
+| `fix/tsconfig-forward-compat` | `fix: use node16 module resolution and configurable test db port` |
 
-```powershell
-git remote add origin <URL_DEL_REPOSITORIO>
-git push -u origin main develop
-git push -u origin feature/backend-foundation feature/gateway feature/docs fix/line-endings
-```
-
-Si se desea reflejar la integracion mediante Pull Request en la plataforma, publicar `feature/docs` **antes** de fusionarla y abrir el PR hacia `develop`; en caso contrario, el merge local `--no-ff` ya deja el historial de integracion.
+Repositorio remoto publico: <https://github.com/gonzaloapaza-creator/segundo_examen_Web2>. Todas las ramas anteriores estan publicadas (`origin`); el historial de integracion queda en los merges `--no-ff` hacia `develop`, visibles con `git log --graph --oneline develop`.
 
 ## 17. Limitaciones de la fase 1
 

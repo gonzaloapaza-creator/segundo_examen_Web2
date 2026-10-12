@@ -86,7 +86,7 @@ Restricciones comprobadas en PostgreSQL (`\d inventory_movements`): `uq_movement
 
 | Pendiente | Motivo | Como completarlo |
 | --- | --- | --- |
-| Push al repositorio remoto publico y Pull Request a `develop` | No se dispone de la URL del repositorio ni de credenciales; no se inventa la URL | Ver README > Flujo de ramas |
+| Pull Request a `develop` en la plataforma | Las ramas `feature/*` ya se integraron localmente con merge `--no-ff`; el repositorio publico es <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> (todas las ramas publicadas) | Opcional: el historial `git log --graph` ya refleja la integracion |
 | Captura de evidencias e informe PDF | Corresponde a la segunda fase | `docs/07-evidencias-para-el-informe.md` |
 | Ejecucion en un equipo distinto desde un clon limpio | Solo se verifico en este equipo (misma maquina, directorio limpio de `node_modules` en Docker) | Seguir README > Arranque desde cero |
 | Prueba en PowerShell 7 | Solo se ejecuto el smoke test en Windows PowerShell 5.1 (el script contempla ambos) | `pwsh .\scripts\smoke-test.ps1` |
