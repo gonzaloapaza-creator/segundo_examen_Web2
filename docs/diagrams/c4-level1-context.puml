@@ -1,0 +1,15 @@
+@startuml c4-level1-context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title StockGuard - Diagrama C4 Nivel 1 (Contexto) - Fase 1
+
+Person(operator, "Operador de tienda", "Encargado de inventario de la tienda de accesorios tecnologicos. Registra entradas/salidas y consulta stock.")
+Person(developer, "Desarrollador / Evaluador", "Explora la API con Swagger UI, Postman o cURL durante la demostracion local.")
+
+System(stockguard, "StockGuard", "API de control de inventario: catalogo (categorias y productos), movimientos auditables con idempotencia, reportes de stock bajo y resumen.")
+
+Rel(operator, stockguard, "Registra movimientos y consulta inventario", "HTTP/JSON via cliente REST (Postman, cURL). Frontend web previsto para la fase 2.")
+Rel(developer, stockguard, "Consulta documentacion y prueba endpoints", "HTTP: /docs (Swagger UI), /api/v1")
+
+SHOW_LEGEND()
+@enduml
