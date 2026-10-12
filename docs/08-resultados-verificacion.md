@@ -69,6 +69,13 @@ Casos de integracion cubiertos (archivo `backend/test/*.e2e-spec.ts`):
 
 Restricciones comprobadas en PostgreSQL (`\d inventory_movements`): `uq_movements_idempotency_key`, `uq_movements_single_reversal (WHERE reverses_movement_id IS NOT NULL)`, `chk_movements_quantity_positive`, `chk_movements_stock_consistency`, `chk_movements_stocks_non_negative`, `fk_movements_product ON DELETE RESTRICT`, `fk_movements_reverses ON DELETE RESTRICT`.
 
+## 5b. Clon limpio
+
+| Paso | Resultado |
+| --- | --- |
+| `git clone -b develop <repo local> /tmp/sg-clone` con la configuracion global de Windows `core.autocrlf=true` (primer intento) | el Gateway entraba en `Restarting (127)`: el checkout convirtio `15-cors-origins.sh` a CRLF y `sh` no encontro el interprete. **Corregido** con `.gitattributes` (`* text=auto eol=lf`, commit `fix: enforce LF line endings...`) |
+| Nuevo clon tras la correccion + `cp .env.example .env` + `docker compose up --build -d` | `file 15-cors-origins.sh` -> `ASCII text executable` (LF); tres servicios `healthy`; `bash scripts/smoke-test.sh` -> `29 OK, 0 FAIL` |
+
 ## 6. Comandos/pruebas destructivos (identificados)
 
 - `docker compose -f docker-compose.test.yml run ... backend-test` y `npm run test:integration`: **TRUNCAN** las tablas de la BD `stockguard_test` (nunca la de demostracion; el helper aborta si el nombre de la BD no contiene `test`).

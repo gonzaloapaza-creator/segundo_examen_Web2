@@ -370,13 +370,14 @@ Ramas y commits creados en esta fase:
 | `feature/backend-foundation` | `feat: scaffold NestJS backend with config, TypeORM migrations and error handling`, `feat: add category and product CRUD`, `feat: add transactional inventory movements with idempotency and reversals`, `feat: add idempotent demo seed`, `test: verify inventory concurrency, idempotency and catalog rules against PostgreSQL`, `build: add multi-stage backend Dockerfile` |
 | `feature/gateway` | `feat: configure gateway controls (CORS, structured logs, rate limiting, request id)`, `build: add container orchestration with healthchecks and test runner`, `test: add end-to-end smoke tests through the gateway` |
 | `feature/docs` | `docs: add Postman collection and environment with idempotency flows`, `docs: document API and local setup` |
+| `fix/line-endings` | `fix: enforce LF line endings for container scripts and configs` (hallado al probar un clon limpio en Windows) |
 
 **Pendiente para la entrega (requiere al estudiante):** crear el repositorio remoto **publico**, agregar el remoto y publicar las ramas:
 
 ```powershell
 git remote add origin <URL_DEL_REPOSITORIO>
 git push -u origin main develop
-git push -u origin feature/backend-foundation feature/gateway feature/docs
+git push -u origin feature/backend-foundation feature/gateway feature/docs fix/line-endings
 ```
 
 Si se desea reflejar la integracion mediante Pull Request en la plataforma, publicar `feature/docs` **antes** de fusionarla y abrir el PR hacia `develop`; en caso contrario, el merge local `--no-ff` ya deja el historial de integracion.
