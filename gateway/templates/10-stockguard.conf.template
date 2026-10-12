@@ -1,0 +1,93 @@
+# ============================================================================
+# StockGuard Gateway - proxy inverso Nginx (plantilla renderizada con envsubst)
+# Caracteristicas transversales: CORS, logging estructurado, rate limiting,
+# trazabilidad (X-Request-ID), limites de tamano y tiempos de espera.
+# ============================================================================
+
+# Rate limiting por IP real del socket ($binary_remote_addr): un cliente no puede
+# eludirlo enviando X-Forwarded-For arbitrario.
+limit_req_zone $binary_remote_addr zone=api_per_ip:10m rate=${RATE_LIMIT_RPS}r/s;
+limit_req_status 429;
+
+server {
+    listen 80;
+    server_name _;
+
+    # Resolver interno de Docker: tolera reinicios del backend con cambio de IP.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
+
+    # Limites de tamano y tiempos de espera
+    client_max_body_size ${CLIENT_MAX_BODY_SIZE};
+    client_body_timeout 15s;
+    client_header_timeout 15s;
+    send_timeout 30s;
+    proxy_connect_timeout ${PROXY_CONNECT_TIMEOUT}s;
+    proxy_read_timeout ${PROXY_READ_TIMEOUT}s;
+    proxy_send_timeout ${PROXY_READ_TIMEOUT}s;
+
+    # Trazabilidad: el Gateway SIEMPRE genera el identificador y lo devuelve al cliente.
+    add_header X-Request-ID $request_id always;
+    add_header X-Content-Type-Options nosniff always;
+
+    # ---------------- Salud del propio Gateway (sin rate limit) ----------------
+    location = /health {
+        default_type application/json;
+        return 200 '{"status":"ok","component":"gateway","requestId":"$request_id"}';
+    }
+
+    # ---------------- Salud del backend via Gateway (sin rate limit) ----------------
+    location /api/v1/health/ {
+        include /etc/nginx/snippets/proxy.conf;
+        include /etc/nginx/snippets/cors.conf;
+        proxy_pass $backend_upstream;
+    }
+
+    # ---------------- API REST ----------------
+    location /api/v1/ {
+        limit_req zone=api_per_ip burst=${RATE_LIMIT_BURST} nodelay;
+        include /etc/nginx/snippets/proxy.conf;
+        include /etc/nginx/snippets/cors.conf;
+        proxy_pass $backend_upstream;
+    }
+
+    # ---------------- Swagger UI y OpenAPI (JSON/YAML) ----------------
+    # /docs, /docs/openapi.json, /docs/openapi.yaml
+    location /docs {
+        limit_req zone=api_per_ip burst=${RATE_LIMIT_BURST} nodelay;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass $backend_upstream;
+    }
+
+    # ---------------- Frontend (fase 2) ----------------
+    # Hoy sirve una pagina estatica de bienvenida. En la fase 2 se copiara el build de
+    # React/Vite a /usr/share/nginx/html y try_files mantendra el enrutado SPA.
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # ---------------- Errores generados por el Gateway en JSON ----------------
+    error_page 429 = @rate_limited;
+    error_page 502 503 504 = @backend_unavailable;
+    error_page 413 = @payload_too_large;
+
+    location @rate_limited {
+        default_type application/json;
+        include /etc/nginx/snippets/cors.conf;
+        return 429 '{"statusCode":429,"code":"RATE_LIMITED","message":"Demasiadas peticiones; intente nuevamente en unos segundos","timestamp":"$time_iso8601","path":"$uri","requestId":"$request_id"}';
+    }
+
+    location @backend_unavailable {
+        default_type application/json;
+        include /etc/nginx/snippets/cors.conf;
+        return 503 '{"statusCode":503,"code":"SERVICE_UNAVAILABLE","message":"El servicio backend no esta disponible","timestamp":"$time_iso8601","path":"$uri","requestId":"$request_id"}';
+    }
+
+    location @payload_too_large {
+        default_type application/json;
+        include /etc/nginx/snippets/cors.conf;
+        return 413 '{"statusCode":413,"code":"PAYLOAD_TOO_LARGE","message":"El cuerpo de la solicitud supera el tamano maximo permitido","timestamp":"$time_iso8601","path":"$uri","requestId":"$request_id"}';
+    }
+}
