@@ -34,9 +34,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const req = ctx.getRequest<Request>();
 
     const { status, code, message, details } = this.normalize(exception);
+    // Los errores del body-parser (JSON malformado) ocurren antes del RequestIdMiddleware:
+    // se recupera el identificador que propaga el Gateway para no perder la trazabilidad.
+    const requestId = req.requestId ?? req.header('x-request-id') ?? res.getHeader('X-Request-ID')?.toString() ?? 'unknown';
     if (status >= 500) {
       this.logger.error(
-        JSON.stringify({ requestId: req.requestId, path: req.originalUrl, error: exception instanceof Error ? exception.message : String(exception) }),
+        JSON.stringify({ requestId, path: req.originalUrl, error: exception instanceof Error ? exception.message : String(exception) }),
         exception instanceof Error ? exception.stack : undefined,
       );
     }
@@ -48,7 +51,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ...(details !== undefined ? { details } : {}),
       timestamp: new Date().toISOString(),
       path: req.originalUrl,
-      requestId: req.requestId,
+      requestId,
     };
     res.status(status).json(body);
   }

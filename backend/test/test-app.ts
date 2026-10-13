@@ -25,9 +25,7 @@ export async function createTestApp(): Promise<TestContext> {
   await app.init();
   app.getHttpServer().setMaxListeners(0);
   const dataSource = app.get(DataSource);
-  if (dataSource.options.database !== 'stockguard_test' && !String(dataSource.options.database).includes('test')) {
-    throw new Error(`Proteccion: las pruebas solo se ejecutan contra una BD cuyo nombre contenga "test" (actual: ${String(dataSource.options.database)})`);
-  }
+  await assertIsolatedTestDatabase(dataSource);
   await dataSource.runMigrations({ transaction: 'each' });
 
   const reset = async () => {
@@ -41,6 +39,26 @@ export async function createTestApp(): Promise<TestContext> {
     reset,
     close: () => app.close(),
   };
+}
+
+/**
+ * Guardas contra ejecutar las pruebas (destructivas: TRUNCATE) sobre la BD de demostracion.
+ * No basta con el nombre: se exige NODE_ENV=test, que la conexion provenga de setup-env.ts
+ * (variables TEST_POSTGRES_*), un nombre con sufijo `_test` y que la BD realmente conectada
+ * (`current_database()`) coincida con la configurada.
+ */
+async function assertIsolatedTestDatabase(dataSource: DataSource): Promise<void> {
+  const configured = String(dataSource.options.database ?? '');
+  const fail = (reason: string) => {
+    throw new Error(`Proteccion de BD de pruebas: ${reason}. Las pruebas de integracion TRUNCAN tablas y solo se ejecutan contra la BD efimera de docker-compose.test.yml.`);
+  };
+  if (process.env.NODE_ENV !== 'test') fail(`NODE_ENV debe ser "test" (actual: ${process.env.NODE_ENV})`);
+  if (!/_test$/.test(configured)) fail(`el nombre de la BD debe terminar en "_test" (actual: "${configured}")`);
+  if (process.env.TEST_POSTGRES_DB !== undefined && process.env.TEST_POSTGRES_DB !== configured) {
+    fail(`TEST_POSTGRES_DB (${process.env.TEST_POSTGRES_DB}) no coincide con la BD configurada (${configured})`);
+  }
+  const [row] = (await dataSource.query('SELECT current_database() AS db, current_user AS usr')) as { db: string; usr: string }[];
+  if (row.db !== configured) fail(`la BD conectada (${row.db}) no coincide con la configurada (${configured})`);
 }
 
 export const api = (path: string) => `/${API_PREFIX}${path}`;

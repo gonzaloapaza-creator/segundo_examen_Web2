@@ -1,0 +1,14 @@
+# Override OPCIONAL: publica el PostgreSQL de pruebas en loopback para ejecutar Jest desde el host
+# (`npm test` en backend/ con Node.js instalado). No es necesario para el runner en Docker.
+#
+#   docker compose -f docker-compose.test.yml -f docker-compose.test.host.yml up -d db-test
+#   cd backend && npm ci && npm test
+#   docker compose -f docker-compose.test.yml -f docker-compose.test.host.yml down -v
+#
+# Cambiar el puerto si 55432 esta reservado en Windows:
+#   $env:TEST_DB_PORT = "56432"; $env:TEST_POSTGRES_PORT = "56432"
+
+services:
+  db-test:
+    ports:
+      - "127.0.0.1:${TEST_DB_PORT:-55432}:5432"

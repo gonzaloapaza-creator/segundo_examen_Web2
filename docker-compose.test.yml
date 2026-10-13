@@ -1,9 +1,13 @@
 # StockGuard - entorno de PRUEBAS DE INTEGRACION (independiente de la demostracion).
 # Levanta un PostgreSQL efimero con la BD `stockguard_test` y ejecuta Jest dentro de un contenedor
 # construido desde la etapa `build` del Dockerfile del backend (no requiere Node.js en el host).
+# El runner llega a PostgreSQL por la red interna `stockguard-test-net`: NO se publica ningun puerto.
 #
 #   docker compose -f docker-compose.test.yml run --rm --build backend-test
 #   docker compose -f docker-compose.test.yml down -v
+#
+# Opcional (solo para ejecutar `npm test` desde el host): publicar el puerto en loopback con el override
+#   docker compose -f docker-compose.test.yml -f docker-compose.test.host.yml up -d db-test
 #
 # ADVERTENCIA: las pruebas TRUNCAN las tablas de `stockguard_test`. Nunca apunte estas pruebas
 # a la base de datos de demostracion (volumen stockguard-pgdata).
@@ -13,14 +17,11 @@ name: stockguard-test
 services:
   db-test:
     image: postgres:16.15-alpine
-    container_name: stockguard-db-test
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard-test}-db
     environment:
       POSTGRES_USER: stockguard
       POSTGRES_PASSWORD: test_only_password
       POSTGRES_DB: stockguard_test
-    # Publicado solo en loopback para poder ejecutar `npm run test:integration` desde el host si se desea.
-    ports:
-      - "127.0.0.1:${TEST_DB_PORT:-55432}:5432"
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
@@ -35,8 +36,8 @@ services:
     build:
       context: ./backend
       target: build
-    image: stockguard/backend-test:0.1.0
-    container_name: stockguard-backend-test
+    image: stockguard/backend-test:1.0.0
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard-test}-runner
     environment:
       NODE_ENV: test
       TEST_POSTGRES_HOST: db-test

@@ -36,14 +36,15 @@ Obligatoria en \`POST /movements\` y \`POST /movements/{id}/reversal\`.
 Formato unico: \`{ statusCode, code, message, details?, timestamp, path, requestId }\`.
 El \`requestId\` lo genera el Gateway (cabecera \`X-Request-ID\`) y permite correlacionar logs.
 
-> Esta primera fase **no incluye autenticacion**: pensada para demostracion local detras del Gateway Nginx.
+> El sistema **no incluye autenticacion ni frontend**: esta pensado para demostracion local detras del Gateway Nginx,
+> consumido con Swagger UI, Postman o cURL.
 `;
 
 export function setupSwagger(app: INestApplication) {
   const config = new DocumentBuilder()
     .setTitle('StockGuard API')
     .setDescription(DESCRIPTION)
-    .setVersion('0.1.0')
+    .setVersion('1.0.0')
     .setContact('Gonzalo Gabriel Apaza Ticona', '', '')
     .addServer('/', 'Gateway (mismo origen)')
     .addTag('Categorias', 'CRUD de categorias')

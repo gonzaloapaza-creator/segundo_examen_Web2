@@ -1,6 +1,10 @@
 # StockGuard - orquestacion de demostracion local
 # Tres servicios permanentes: gateway (unico puerto publicado), backend y db.
 # Uso: cp .env.example .env && docker compose up --build -d
+#
+# Los nombres de contenedores y del volumen derivan de COMPOSE_PROJECT_NAME (por defecto `stockguard`),
+# de modo que se puede levantar una segunda instancia aislada (por ejemplo para probar un clon limpio) con:
+#   COMPOSE_PROJECT_NAME=sgclone GATEWAY_PORT=18080 docker compose up --build -d
 
 name: stockguard
 
@@ -8,8 +12,8 @@ services:
   gateway:
     build:
       context: ./gateway
-    image: stockguard/gateway:0.1.0
-    container_name: stockguard-gateway
+    image: stockguard/gateway:1.0.0
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard}-gateway
     restart: unless-stopped
     environment:
       BACKEND_HOST: backend
@@ -38,8 +42,8 @@ services:
     build:
       context: ./backend
       target: runtime
-    image: stockguard/backend:0.1.0
-    container_name: stockguard-backend
+    image: stockguard/backend:1.0.0
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard}-backend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
@@ -69,7 +73,7 @@ services:
 
   db:
     image: postgres:16.15-alpine
-    container_name: stockguard-db
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard}-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER en .env}
@@ -94,4 +98,5 @@ networks:
 
 volumes:
   stockguard-pgdata:
-    name: stockguard-pgdata
+    # Volumen nombrado y persistente (sobrevive a `docker compose down`; solo `down -v` lo elimina).
+    name: ${COMPOSE_PROJECT_NAME:-stockguard}-pgdata

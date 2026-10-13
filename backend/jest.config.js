@@ -1,6 +1,6 @@
 /** @type {import('jest').Config} */
 const base = {
-  transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }] },
+  transform: { '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json', diagnostics: { ignoreCodes: [151002] } }] },
   moduleFileExtensions: ['ts', 'js', 'json'],
   rootDir: '.',
 };

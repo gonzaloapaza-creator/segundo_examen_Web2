@@ -1,19 +1,19 @@
 @startuml c4-level2-containers
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title StockGuard - Diagrama C4 Nivel 2 (Contenedores) - Fase 1
+title StockGuard - Diagrama C4 Nivel 2 (Contenedores)
 
-Person(operator, "Operador / Evaluador", "Usa un cliente REST (Postman, cURL, Swagger UI) desde el navegador o la terminal.")
+Person(operator, "Operador / Evaluador", "Usa Swagger UI, Postman o cURL desde el navegador o la terminal del host.")
 
 System_Boundary(stockguard, "StockGuard (Docker Compose, red bridge stockguard-net)") {
-    Container(gateway, "API Gateway", "Nginx 1.28 (Alpine)", "Unico punto de entrada HTTP (puerto 8080 publicado). Proxy inverso hacia el backend. Transversales: CORS por lista blanca, logs JSON, rate limiting por IP (429 JSON), X-Request-ID generado y propagado, limites de tamano/tiempos. Sirve placeholder estatico en / (futuro frontend).")
-    Container(backend, "Backend StockGuard", "NestJS 11 / TypeScript / Node.js 22", "Microservicio REST /api/v1: CRUD de categorias y productos, movimientos transaccionales (SELECT FOR UPDATE), idempotencia persistida, reversiones, reportes, salud. DTO + ValidationPipe, Repository, inyeccion de dependencias, migraciones TypeORM, Swagger en /docs.")
-    ContainerDb(db, "Base de datos", "PostgreSQL 16 (Alpine)", "Tablas: categories, products, inventory_movements, idempotency_records, typeorm_migrations. Restricciones CHECK/UNIQUE/FK. Volumen nombrado stockguard-pgdata.")
+    Container(gateway, "API Gateway", "Nginx 1.28 (Alpine)", "Unico punto de entrada HTTP: el unico contenedor con puerto publicado (8080 -> 80). Proxy inverso hacia el backend. Transversales: CORS por lista blanca, logs JSON, rate limiting por IP (429 JSON), X-Request-ID generado y propagado, limites de tamano y tiempos de espera. Sirve una pagina estatica de bienvenida en /.")
+    Container(backend, "Microservicio StockGuard", "NestJS 11 / TypeScript 5.9 / Node.js 22", "API REST /api/v1: CRUD de categorias y productos, movimientos transaccionales (SELECT ... FOR UPDATE), idempotencia persistida, reversiones, reportes y salud. DTO + ValidationPipe, Repository, inyeccion de dependencias, migraciones TypeORM, seed idempotente, Swagger UI y OpenAPI en /docs.")
+    ContainerDb(db, "Base de datos", "PostgreSQL 16 (Alpine)", "Tablas: categories, products, inventory_movements, idempotency_records, typeorm_migrations. Restricciones CHECK/UNIQUE/FK. Volumen nombrado persistente stockguard-pgdata.")
 }
 
 Rel(operator, gateway, "Peticiones HTTP/JSON", "HTTP :8080 -> /api/v1, /docs, /health")
-Rel(gateway, backend, "Reenvia con X-Request-ID y X-Forwarded-*", "HTTP :3000 (solo red interna)")
-Rel(backend, db, "Lee/escribe con transacciones y bloqueo de fila", "TCP :5432 (solo red interna), driver pg / TypeORM")
+Rel(gateway, backend, "Reenvia con X-Request-ID y X-Forwarded-*", "HTTP :3000 (solo red interna, sin puerto publicado)")
+Rel(backend, db, "Lee/escribe con transacciones y bloqueo de fila", "TCP :5432 (solo red interna, sin puerto publicado), driver pg / TypeORM")
 
 Rel_Back(backend, gateway, "Respuestas JSON (sin cabeceras CORS; las agrega el Gateway)", "HTTP")
 

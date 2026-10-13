@@ -1,6 +1,6 @@
 {
   "name": "stockguard-backend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "StockGuard - microservicio NestJS de control de inventario",
   "author": "Gonzalo Gabriel Apaza Ticona",
   "private": true,
