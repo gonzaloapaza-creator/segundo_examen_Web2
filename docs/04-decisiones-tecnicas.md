@@ -75,6 +75,14 @@ Filtro global unico (`HttpExceptionFilter`) que produce `{ statusCode, code, mes
 - La etapa `build` se reutiliza como runner de pruebas (`docker-compose.test.yml`), sin necesidad de Node.js en el host.
 - Compose: `depends_on` con `condition: service_healthy`, volumen nombrado `stockguard-pgdata`, sin bind mounts de codigo, configuracion por `.env` (sin credenciales en el repositorio).
 
-## Alcance explicitamente fuera de la fase 1
+## Alcance explicitamente excluido
 
-Autenticacion/roles, frontend, pagos/facturacion, multiples almacenes, notificaciones, Redis, HTTPS/despliegue publico, reactivacion de productos, borrado fisico de productos.
+Frontend propio (la demostracion se realiza con Swagger UI, Postman y cURL), autenticacion/roles, pagos/facturacion, multiples almacenes, notificaciones, Redis, HTTPS/despliegue publico, reactivacion de productos, borrado fisico de productos.
+
+## Nombres de contenedores y volumen
+
+`container_name` y el nombre del volumen derivan de `COMPOSE_PROJECT_NAME` (por defecto `stockguard`), de modo que `stockguard-gateway`, `stockguard-backend`, `stockguard-db` y `stockguard-pgdata` se mantienen en el uso normal, pero se puede levantar una segunda instancia aislada (por ejemplo, para validar un clon limpio) con `COMPOSE_PROJECT_NAME=sgclone GATEWAY_PORT=18080 docker compose up --build -d` sin colisionar con la instancia principal.
+
+## Entorno de pruebas aislado
+
+`docker-compose.test.yml` levanta un PostgreSQL efimero (`tmpfs`, BD `stockguard_test`, credenciales propias) y el runner Jest se conecta por la red interna `stockguard-test-net`; **no publica puertos**. El override opcional `docker-compose.test.host.yml` publica `127.0.0.1:55432` solo si se quiere ejecutar `npm test` desde el host. El helper `backend/test/test-app.ts` aborta si `NODE_ENV != test`, si el nombre de la BD no termina en `_test`, si `TEST_POSTGRES_DB` no coincide con la BD configurada o si `current_database()` difiere; ademas `test/setup-env.ts` ignora las variables `POSTGRES_*` del `.env` de demostracion y solo usa `TEST_POSTGRES_*`.

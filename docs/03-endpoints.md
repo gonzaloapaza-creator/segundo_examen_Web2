@@ -24,7 +24,7 @@ Los errores generados por el propio Gateway (429, 413, 502/503/504) usan el mism
 | Metodo | Ruta | Descripcion | Respuestas |
 | --- | --- | --- | --- |
 | GET | `/health` | Salud del propio Nginx (no pasa por el backend, sin rate limit) | 200 |
-| GET | `/` | Pagina estatica de bienvenida (ruta reservada para el frontend de la fase 2) | 200 |
+| GET | `/` | Pagina estatica de bienvenida con enlaces a Swagger, OpenAPI y salud (no hay frontend) | 200 |
 | GET | `/docs` | Swagger UI (proxy al backend) | 200 |
 | GET | `/docs/openapi.json` | OpenAPI 3 en JSON | 200 |
 | GET | `/docs/openapi.yaml` | OpenAPI 3 en YAML | 200 |

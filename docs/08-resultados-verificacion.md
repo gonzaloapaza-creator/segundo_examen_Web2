@@ -32,7 +32,7 @@ Casos de integracion cubiertos (archivo `backend/test/*.e2e-spec.ts`):
 | `GET /api/v1/health/ready` | 200 `{"status":"ok","checks":{"database":"up"}}` |
 | `GET /api/v1/health/ready` con `docker compose stop db` | **503** `{"code":"SERVICE_UNAVAILABLE","details":{"database":"down"}}`; tras `docker compose start db` -> 200 |
 | `GET /docs` | 200 `text/html` (Swagger UI); `GET /docs/openapi.json` -> 200 `{"openapi":"3.0.0",...}` |
-| `GET /` | 200 pagina estatica (ruta reservada para el frontend) |
+| `GET /` | 200 pagina estatica (en esta verificacion temprana la ruta estaba reservada para un futuro frontend; esa fase se descarto despues y la pagina ahora es de bienvenida con enlaces, ver `docs/03-endpoints.md` y `docs/04-decisiones-tecnicas.md`) |
 | `GET /api/v1/reports/summary` tras el seed | `{"activeProducts":11,"totalUnits":122,"lowStockProducts":5,"categories":5}` |
 
 ## 3. Gateway
@@ -82,11 +82,26 @@ Restricciones comprobadas en PostgreSQL (`\d inventory_movements`): `uq_movement
 - `docker compose down -v`: elimina el volumen `stockguard-pgdata` (perdida de datos de demostracion).
 - Los smoke tests y la coleccion Postman **no** borran datos: crean categorias/productos con prefijo `SMOKE-*`/`Postman <runId>` y dejan el producto dado de baja (historial conservado).
 
-## 7. No ejecutado en este entorno (pendiente del estudiante)
+## 7. Reverificacion del cierre tecnico (2026-10-17)
 
-| Pendiente | Motivo | Como completarlo |
+Repetida de forma independiente sobre la rama `feature/cierre-tecnico` (commit `eefb37f` + los cambios de documentacion de este cierre), en la misma maquina y sin afectar la instancia de demostracion ya en ejecucion:
+
+| Verificacion | Comando | Resultado |
 | --- | --- | --- |
-| Pull Request a `develop` en la plataforma | Las ramas `feature/*` ya se integraron localmente con merge `--no-ff`; el repositorio publico es <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> (todas las ramas publicadas) | Opcional: el historial `git log --graph` ya refleja la integracion |
-| Captura de evidencias e informe PDF | Corresponde a la segunda fase | `docs/07-evidencias-para-el-informe.md` |
-| Ejecucion en un equipo distinto desde un clon limpio | Solo se verifico en este equipo (misma maquina, directorio limpio de `node_modules` en Docker) | Seguir README > Arranque desde cero |
-| Prueba en PowerShell 7 | Solo se ejecuto el smoke test en Windows PowerShell 5.1 (el script contempla ambos) | `pwsh .\scripts\smoke-test.ps1` |
+| Type-check | `npm run typecheck` (en `backend/`) | sin errores |
+| Pruebas unitarias + integracion en Docker | `docker compose -f docker-compose.test.yml run --rm --build backend-test` | `Test Suites: 5 passed, 5 total`; `Tests: 35 passed, 35 total` (BD efimera `stockguard_test`; se limpio despues con `docker compose -f docker-compose.test.yml down -v`, que **no** toca `stockguard-pgdata`) |
+| Smoke test contra la instancia de demostracion en ejecucion | `.\scripts\smoke-test.ps1` | `29 OK, 0 FAIL`; se ejecuto contra el stack de demostracion ya levantado por el usuario (`docker ps` antes y despues: `stockguard-gateway/backend/db` sin cambios, `docker volume ls` sigue mostrando `stockguard-pgdata`); el script solo agrego la categoria/producto `SMOKE-<timestamp>` y dio de baja el producto al final, como esta documentado (no se ejecuto `docker compose down`/`up` en este paso, por lo que no se repitio la prueba de persistencia de la seccion 5 en esta fecha) |
+| Estado real de Git Flow | `git fetch origin`; `git log --oneline main`; `git log --oneline main..develop`; `git tag` | `main` = solo el commit inicial (`3b522f8 chore: initialize repository structure`); **no** existe la etiqueta `v1.0.0` ni la rama `release/1.0.0`; `develop` tiene 20 commits que `main` no tiene; `feature/cierre-tecnico` esta un commit por delante de `develop` y publicada en `origin` |
+| Pull Requests en GitHub | `list_pull_requests` (API) | Solo el PR `#1` (`feature/gateway` -> `main`, abierto, sin fusionar), creado automaticamente el 2026-10-12 al publicar esa rama; quedo desactualizado antes de `feature/docs`, los `fix/*` y `feature/cierre-tecnico`, por lo que **no** debe fusionarse tal cual |
+
+Corrige a las afirmaciones anteriores de este documento y de `README.md`/`docs/BASE_PARA_INFORME.md`/`docs/06-matriz-rubrica.md` (version previa) que daban por hecho que `main` ya tenia la etiqueta `v1.0.0`: **no era asi** y se corrigio en toda la documentacion durante este cierre.
+
+## 8. No ejecutado en este entorno (pendiente)
+
+| Pendiente | Tipo | Motivo | Como completarlo |
+| --- | --- | --- | --- |
+| Pull Request `feature/cierre-tecnico` -> `develop` | Tecnico (no es tarea del estudiante) | Preparado en este cierre; falta revision/aprobacion humana | Revisar y fusionar en GitHub (merge `--no-ff` o "Squash and merge" segun la convencion del repositorio) |
+| Crear `release/1.0.0` desde `develop` y Pull Request hacia `main` | Tecnico (no es tarea del estudiante) | Depende de que se fusione el punto anterior; no se ejecuto porque requiere una decision humana sobre el momento de publicar la version estable | Tras el merge a `develop`: `git checkout -b release/1.0.0 develop`, publicar la rama y abrir el PR hacia `main`; al aprobarlo, etiquetar `v1.0.0` y fusionar de vuelta en `develop` |
+| Captura de evidencias e informe PDF | Estudiante | Corresponde al estudiante, con `docs/GUIA_PRUEBAS_Y_CAPTURAS.md` | Seguir la guia y tomar las capturas indicadas |
+| Ejecucion en un equipo distinto desde un clon limpio | Estudiante/opcional | Solo se verifico en este equipo (ver seccion 5b para el clon limpio ya realizado) | Seguir README > Arranque desde cero |
+| Prueba en PowerShell 7 | Estudiante/opcional | Solo se ejecuto el smoke test en Windows PowerShell 5.1 (el script contempla ambos) | `pwsh .\scripts\smoke-test.ps1` |
