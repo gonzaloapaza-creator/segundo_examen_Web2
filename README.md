@@ -5,7 +5,7 @@
 **Alcance final:** Gateway Nginx + microservicio NestJS/TypeScript + PostgreSQL, orquestados con Docker Compose. **No incluye frontend**: la demostracion se realiza con Swagger UI, Postman y cURL a traves del Gateway.
 
 > Repositorio publico: <https://github.com/gonzaloapaza-creator/segundo_examen_Web2>
-> Rama de integracion (contiene todo el trabajo tecnico): `develop`. Rama estable `main`: **todavia no recibio el merge de `develop`** ni existe la etiqueta `v1.0.0` (verificado el 2026-10-17); ver la seccion 17 para el estado real y el PR de integracion preparado.
+> Rama estable: `main` (version tecnica `v1.0.0`). Rama de integracion continua: `develop`. Ver la seccion 17 para el detalle de Git Flow y el commit exacto etiquetado.
 
 ## Indice
 
@@ -104,11 +104,11 @@ No es necesario instalar PostgreSQL ni Node.js en el host.
 ## 5. Clonacion
 
 ```powershell
-git clone -b develop https://github.com/gonzaloapaza-creator/segundo_examen_Web2.git stockguard
+git clone -b main https://github.com/gonzaloapaza-creator/segundo_examen_Web2.git stockguard
 cd stockguard
 ```
 
-`develop` es, a la fecha, la rama con todo el sistema integrado y funcional. `main` **aun no recibio ese merge** (solo tiene el commit inicial del repositorio) y no existe todavia la etiqueta `v1.0.0`; ver la seccion 17 para el estado real de las ramas y el plan de release.
+`main` contiene la version estable `v1.0.0`. Para ver el trabajo de integracion mas reciente (puede incluir cambios no publicados en `main` todavia): `git clone -b develop ...`.
 
 ## 6. Configuracion (.env)
 
@@ -404,7 +404,7 @@ Verificacion realizada: tras `docker compose down` + `docker compose up -d`, `GE
 
 ## 17. Flujo de ramas (Git Flow)
 
-- `main`: versiones estables (`v1.0.0` = version tecnica del sistema, **pendiente de publicar**).
+- `main`: versiones estables (`v1.0.0` = version tecnica del sistema, publicada).
 - `develop`: integracion continua.
 - `feature/*` y `fix/*`: una rama por bloque funcional o correccion, integradas en `develop` mediante merge `--no-ff` o Pull Request.
 - `release/*`: preparacion de la version estable, fusionada en `main` (etiqueta) y de vuelta en `develop`.
@@ -416,17 +416,16 @@ Verificacion realizada: tras `docker compose down` + `docker compose up -d`, `GE
 | `feature/docs` | Coleccion Postman, documentacion inicial |
 | `fix/line-endings` | `.gitattributes` con LF (hallado al probar un clon limpio en Windows) |
 | `fix/tsconfig-forward-compat` | `moduleResolution node16` y puerto de BD de pruebas configurable |
-| `feature/cierre-tecnico` | Cierre final: alcance sin frontend, entorno de pruebas aislado, nombres de Compose parametrizables, `requestId` en errores de JSON malformado, README/docs/C4 definitivos, base para el informe y guia de pruebas |
-| `release/1.0.0` | **Pendiente de crear**: preparacion de la version estable, a cortar desde `develop` una vez fusionado `feature/cierre-tecnico` |
+| `feature/cierre-tecnico` | Cierre final: alcance sin frontend, entorno de pruebas aislado, nombres de Compose parametrizables, `requestId` en errores de JSON malformado, README/docs/C4 definitivos, base para el informe y guia de pruebas (integrada en `develop` mediante PR `#2`) |
+| `release/1.0.0` | Ajustes finales de release (version estable del README y la documentacion); fusionada en `main` y de vuelta en `develop` |
 
-### Estado real verificado el 2026-10-17 (no asumir lo contrario)
+### Estado real verificado (ver `docs/08-resultados-verificacion.md` para el detalle completo)
 
-- `main` solo contiene el commit inicial del repositorio (`chore: initialize repository structure`); **no** tiene el codigo de `backend/`, `gateway/` ni la documentacion, y **no** existe todavia la etiqueta `v1.0.0`.
-- `develop` si contiene todo el trabajo integrado (`feature/backend-foundation`, `feature/gateway`, `feature/docs`, `fix/line-endings`, `fix/tsconfig-forward-compat`), fusionado con merges `--no-ff`.
-- `feature/cierre-tecnico` esta un commit por delante de `develop` y fue publicada en `origin`.
-- Hay un Pull Request abierto (`#1`, `feature/gateway` -> `main`) creado automaticamente por GitHub al publicar esa rama; **no refleja el estado actual** (quedo desactualizado antes de `feature/docs`, los `fix/*` y `feature/cierre-tecnico`) y no debe fusionarse tal cual.
-- Pull Request preparado como parte de este cierre: `feature/cierre-tecnico` -> `develop`. Falta que un revisor lo apruebe y lo fusione (Git Flow + proteccion de rama de `develop`).
-- Una vez fusionado ese PR, el siguiente paso es cortar `release/1.0.0` desde `develop`, abrir un Pull Request `release/1.0.0` -> `main`, y tras su aprobacion y merge, etiquetar `v1.0.0` en `main` y fusionar de vuelta en `develop`. Ese paso **no se hizo todavia**.
+- `main` contiene el merge de `release/1.0.0` (todo el codigo de `backend/`, `gateway/`, Docker Compose, documentacion, Postman y diagramas) y esta etiquetado `v1.0.0`.
+- `develop` contiene el mismo contenido (la release se fusiono de vuelta) mas el historial completo de `feature/*`/`fix/*`.
+- El PR `#1` (`feature/gateway` -> `main`), creado automaticamente por GitHub al publicar esa rama el 2026-10-12, quedo desactualizado antes de `feature/docs`, los `fix/*` y `feature/cierre-tecnico`; su contenido ya esta integrado en `main` por otra via (via `develop` y la release), por lo que se cerro sin fusionar.
+- El PR `#2` (`feature/cierre-tecnico` -> `develop`) se fusiono con merge commit, conservando el historial.
+- Verificar el estado exacto en cualquier momento con: `git fetch origin --tags`, `git log --oneline -1 origin/main`, `git log --oneline -1 origin/develop`, `git show v1.0.0 --no-patch --format=%H`.
 
 Historial: `git log --oneline --graph --all`.
 

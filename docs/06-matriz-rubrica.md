@@ -50,8 +50,8 @@ Estado: **OK** = implementado y verificado tecnicamente (ver `08-resultados-veri
 | Criterio | Evidencia | Estado |
 | --- | --- | --- |
 | Repositorio publico | <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> | OK (ver nota en `08-resultados-verificacion.md` sobre la comprobacion de acceso sin autenticacion) |
-| Historial Git Flow (ramas `feature/*`/`fix/*` integradas en `develop` con merge `--no-ff`) | Ramas `develop`, `feature/backend-foundation`, `feature/gateway`, `feature/docs`, `fix/line-endings`, `fix/tsconfig-forward-compat`, `feature/cierre-tecnico` publicadas en `origin` | OK |
-| Release `v1.0.0` fusionada en `main` | `release/1.0.0` y etiqueta `v1.0.0` | **PENDIENTE**: `main` solo tiene el commit inicial del repositorio (verificado el 2026-10-17); falta fusionar `feature/cierre-tecnico` en `develop`, cortar `release/1.0.0` y abrir el Pull Request hacia `main` (ver `README.md` seccion 17 y `08-resultados-verificacion.md`) |
+| Historial Git Flow (ramas `feature/*`/`fix/*` integradas en `develop`, release fusionada en `main` y de vuelta en `develop`, merges `--no-ff`) | Ramas `develop`, `feature/backend-foundation`, `feature/gateway`, `feature/docs`, `fix/line-endings`, `fix/tsconfig-forward-compat`, `feature/cierre-tecnico`, `release/1.0.0` publicadas en `origin` | OK |
+| Release `v1.0.0` fusionada en `main` | `release/1.0.0` fusionada en `main` (y de vuelta en `develop`); etiqueta anotada `v1.0.0` | OK (ver `docs/08-resultados-verificacion.md` para los SHA exactos verificados) |
 | README con clonacion, ejecucion con Docker Compose y pruebas cURL/Postman | `README.md` secciones 5-13 | OK |
 | Informe PDF (5-8 paginas) con evidencias reales | `docs/BASE_PARA_INFORME.md` + `docs/GUIA_PRUEBAS_Y_CAPTURAS.md` | **PENDIENTE (estudiante)** |
 | Entrega en Moodle | - | **PENDIENTE (estudiante)** |

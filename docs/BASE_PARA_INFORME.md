@@ -12,7 +12,7 @@ Documento autocontenido con la informacion tecnica del proyecto, pensado para qu
 | Estudiante | Gonzalo Gabriel Apaza Ticona |
 | Universidad | Universidad Catolica Boliviana "San Pablo" |
 | Materia | Tecnologias Web 2 (segundo parcial) |
-| Repositorio | <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> (rama `develop`: codigo integrado y funcional; `main`: aun sin el merge de `develop` ni etiqueta `v1.0.0`, ver seccion 11.1) |
+| Repositorio | <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> (rama estable `main`, etiqueta `v1.0.0`; ver seccion 11.1 para el detalle de la integracion) |
 | Tipo de entrega | Examen de API Gateway y microservicio backend (NestJS + TypeScript obligatorio) |
 
 Datos no proporcionados y por tanto no incluidos aqui: nombre del docente, paralelo, fecha de defensa.
@@ -618,10 +618,10 @@ Conclusion: el codigo y las 35 pruebas siguen pasando tras los cambios de docume
 | `feature/docs` | coleccion Postman; documentacion | merge `--no-ff` en `develop` |
 | `fix/line-endings` | `.gitattributes` LF (hallado en un clon limpio en Windows) | merge `--no-ff` en `develop` |
 | `fix/tsconfig-forward-compat` | `moduleResolution node16`; puerto de BD de pruebas configurable | merge `--no-ff` en `develop` |
-| `feature/cierre-tecnico` | aislamiento del entorno de pruebas, nombres de Compose parametrizables, `requestId` en errores de JSON malformado, alcance sin frontend, README/docs/C4 definitivos, base para el informe y guia de pruebas, correcciones de este cierre | Pull Request preparado hacia `develop` (pendiente de revision/merge) |
-| `release/1.0.0` | ajustes finales de release | **Pendiente de crear** desde `develop` una vez fusionado `feature/cierre-tecnico`; luego Pull Request hacia `main`, merge y etiqueta `v1.0.0` |
+| `feature/cierre-tecnico` | aislamiento del entorno de pruebas, nombres de Compose parametrizables, `requestId` en errores de JSON malformado, alcance sin frontend, README/docs/C4 definitivos, base para el informe y guia de pruebas, correcciones de este cierre | Pull Request `#2` fusionado en `develop` (merge commit) |
+| `release/1.0.0` | ajustes finales de README/documentacion para la version estable | Fusionada en `main` (merge commit) y de vuelta en `develop`; etiqueta anotada `v1.0.0` sobre el commit de `main` |
 
-Estado real verificado el 2026-10-17: `main` **todavia no** tiene el merge de `develop` (solo el commit inicial del repositorio) y **no existe** la etiqueta `v1.0.0` ni la rama `release/1.0.0`. La version "estable tecnica" esta completa y probada en `develop`/`feature/cierre-tecnico`, pero su publicacion en `main` es un paso de Git Flow que queda pendiente (requiere aprobar el PR hacia `develop`, cortar la release y aprobar el PR hacia `main`). El informe PDF y la entrega en Moodle son posteriores y corresponden al estudiante. Enlaces concretos a PR y commits: `docs/08-resultados-verificacion.md`.
+Estado real verificado tras la integracion (ver `docs/08-resultados-verificacion.md` para los comandos y SHA exactos): `main` contiene el merge de `release/1.0.0` (todo el codigo de `backend/`, `gateway/`, Docker Compose, documentacion, Postman y diagramas) y esta etiquetado `v1.0.0`; `develop` recibio la misma release de vuelta. El informe PDF y la entrega en Moodle son posteriores y corresponden al estudiante.
 
 ### 11.2 Criterios del examen vs. evidencia
 
@@ -646,9 +646,9 @@ Estado real verificado el 2026-10-17: `main` **todavia no** tiene el merge de `d
 2. Redactar el informe PDF (5-8 paginas) con ChatGPT a partir de este documento, las capturas y los archivos listados en 12.5.
 3. Subir el PDF y el enlace del repositorio a Moodle.
 
-### 11.4 Pendiente tecnico (no es tarea del estudiante)
+### 11.4 Integracion tecnica completada (no es tarea del estudiante)
 
-Fusionar el Pull Request `feature/cierre-tecnico` -> `develop`, cortar `release/1.0.0` y fusionarla en `main` con la etiqueta `v1.0.0` (seccion 11.1). Mientras eso no ocurra, `main` seguira sin el codigo del proyecto; para clonar y ejecutar el sistema usar `develop` (ver README seccion 5).
+El Pull Request `#2` (`feature/cierre-tecnico` -> `develop`) se fusiono; se creo `release/1.0.0` desde `develop`, se fusiono en `main` y de vuelta en `develop`; se publico la etiqueta anotada `v1.0.0`. Detalle y comandos verificados en `docs/08-resultados-verificacion.md`.
 
 ---
 
