@@ -1,0 +1,2145 @@
+{
+  "info": {
+    "_postman_id": "b7f2c9e1-4d35-4a8e-8f61-9c0d1e2f3a4b",
+    "name": "StockGuard API",
+    "description": "Coleccion de StockGuard a traves del Gateway Nginx ({{baseUrl}}).\n\nEjecutar las carpetas en orden (Runner o manualmente). Los IDs creados se guardan en el entorno.\nLas pruebas de idempotencia reutilizan DELIBERADAMENTE la misma clave (variables idemKey*), generada una sola vez por ejecucion (runId).\n\nAutor: Gonzalo Gabriel Apaza Ticona - UCB \"San Pablo\".",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Inicializa un identificador de ejecucion y las claves de idempotencia UNA sola vez.",
+          "if (!pm.environment.get(\"runId\")) {",
+          "  const runId = Date.now().toString(36);",
+          "  pm.environment.set(\"runId\", runId);",
+          "  pm.environment.set(\"idemKeyIn\", `pm-${runId}-in-0001`);",
+          "  pm.environment.set(\"idemKeyOut\", `pm-${runId}-out-0001`);",
+          "  pm.environment.set(\"idemKeyReversal\", `pm-${runId}-rev-0001`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Salud y documentacion",
+      "item": [
+        {
+          "name": "Gateway /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Backend liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "live"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Backend readiness (PostgreSQL)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "ready"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"database up\", () => pm.expect(pm.response.json().checks.database).to.eql(\"up\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OpenAPI JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "docs",
+                "openapi.json"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"openapi 3\", () => pm.expect(pm.response.json().openapi).to.match(/^3\\./));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Categorias (CRUD)",
+      "item": [
+        {
+          "name": "Crear categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman {{runId}} - Cables\",\n  \"description\": \"Categoria creada desde Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.environment.set(\"categoryId\", pm.response.json().id);",
+                  "pm.test(\"name normalizado\", () => pm.expect(pm.response.json().name).to.include(\"Cables\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear categoria duplicada (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"  postman {{runId}} - CABLES  \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = CATEGORY_NAME_TAKEN\", () => pm.expect(pm.response.json().code).to.eql(\"CATEGORY_NAME_TAKEN\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear categoria invalida (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \" \",\n  \"extra\": \"no permitido\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = VALIDATION_ERROR\", () => pm.expect(pm.response.json().code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });",
+                  "pm.test(\"details por campo\", () => pm.expect(pm.response.json().details).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar categorias (paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories?page=1&limit=10&sortBy=name&order=asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name"
+                },
+                {
+                  "key": "order",
+                  "value": "asc"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"meta de paginacion\", () => { const m = pm.response.json().meta; [\"page\",\"limit\",\"totalItems\",\"totalPages\",\"hasNextPage\",\"hasPreviousPage\"].forEach(k => pm.expect(m).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener categoria",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar categoria",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Descripcion actualizada desde Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"description actualizada\", () => pm.expect(pm.response.json().description).to.include(\"actualizada\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Categoria inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/00000000-0000-4000-8000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "00000000-0000-4000-8000-000000000000"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = CATEGORY_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"CATEGORY_NOT_FOUND\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Productos (CRUD)",
+      "item": [
+        {
+          "name": "Crear producto (stock inicial 0)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"pm-{{runId}}-usbc\",\n  \"name\": \"Cable USB-C Postman\",\n  \"description\": \"Trenzado 60 W\",\n  \"referencePrice\": \"49.90\",\n  \"minimumStock\": 3,\n  \"categoryId\": \"{{categoryId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "const p = pm.response.json(); pm.environment.set(\"productId\", p.id);",
+                  "pm.test(\"stock inicial 0\", () => pm.expect(p.stock).to.eql(0));",
+                  "pm.test(\"SKU normalizado a mayusculas\", () => pm.expect(p.sku).to.eql(p.sku.toUpperCase()));",
+                  "pm.test(\"precio como cadena decimal\", () => pm.expect(p.referencePrice).to.eql(\"49.90\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear producto con stock en el body (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"pm-{{runId}}-bad\",\n  \"name\": \"Invalido\",\n  \"referencePrice\": \"-5\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"stock\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = VALIDATION_ERROR\", () => pm.expect(pm.response.json().code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear producto SKU duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"PM-{{runId}}-USBC\",\n  \"name\": \"Otro\",\n  \"referencePrice\": \"1.00\",\n  \"categoryId\": \"{{categoryId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = PRODUCT_SKU_TAKEN\", () => pm.expect(pm.response.json().code).to.eql(\"PRODUCT_SKU_TAKEN\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar productos (busqueda y filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?search=usbc&categoryId={{categoryId}}&status=active&sortBy=name&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "usbc"
+                },
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}"
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"incluye el producto creado\", () => pm.expect(pm.response.json().data.map(p => p.id)).to.include(pm.environment.get(\"productId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar producto (sin stock)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"minimumStock\": 5,\n  \"description\": \"Actualizado desde Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"minimumStock = 5\", () => pm.expect(pm.response.json().minimumStock).to.eql(5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar categoria con productos (409)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = CATEGORY_HAS_PRODUCTS\", () => pm.expect(pm.response.json().code).to.eql(\"CATEGORY_HAS_PRODUCTS\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Movimientos e idempotencia",
+      "item": [
+        {
+          "name": "Entrada IN 10 (clave idemKeyIn)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKeyIn}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"IN\",\n  \"quantity\": 10,\n  \"reason\": \"Compra a proveedor - Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "const m = pm.response.json(); pm.environment.set(\"movementInId\", m.id);",
+                  "pm.test(\"previous 0 -> resulting 10\", () => { pm.expect(m.previousStock).to.eql(0); pm.expect(m.resultingStock).to.eql(10); });",
+                  "pm.test(\"Idempotent-Replayed: false\", () => pm.expect(pm.response.headers.get(\"Idempotent-Replayed\")).to.eql(\"false\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reintento IN con LA MISMA clave (replay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKeyIn}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"in\",\n  \"quantity\": 10,\n  \"reason\": \"  Compra a proveedor -   Postman \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"Idempotent-Replayed: true\", () => pm.expect(pm.response.headers.get(\"Idempotent-Replayed\")).to.eql(\"true\"));",
+                  "pm.test(\"mismo movimiento, sin duplicar\", () => pm.expect(pm.response.json().id).to.eql(pm.environment.get(\"movementInId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Misma clave con contenido distinto (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKeyIn}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"IN\",\n  \"quantity\": 11,\n  \"reason\": \"Compra a proveedor - Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = IDEMPOTENCY_KEY_REUSED\", () => pm.expect(pm.response.json().code).to.eql(\"IDEMPOTENCY_KEY_REUSED\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin cabecera Idempotency-Key (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"IN\",\n  \"quantity\": 1,\n  \"reason\": \"Sin clave\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = IDEMPOTENCY_KEY_REQUIRED\", () => pm.expect(pm.response.json().code).to.eql(\"IDEMPOTENCY_KEY_REQUIRED\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salida OUT 4 (clave idemKeyOut)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKeyOut}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"OUT\",\n  \"quantity\": 4,\n  \"reason\": \"Venta mostrador - Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "const m = pm.response.json(); pm.environment.set(\"movementOutId\", m.id);",
+                  "pm.test(\"resulting 6\", () => pm.expect(m.resultingStock).to.eql(6));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salida mayor al stock (409 INSUFFICIENT_STOCK)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "pm-{{runId}}-out-9999",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"OUT\",\n  \"quantity\": 999,\n  \"reason\": \"Venta imposible\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = INSUFFICIENT_STOCK\", () => pm.expect(pm.response.json().code).to.eql(\"INSUFFICIENT_STOCK\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });",
+                  "pm.test(\"details.available = 6\", () => pm.expect(pm.response.json().details.available).to.eql(6));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stock del producto = 6",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"stock 6\", () => pm.expect(pm.response.json().stock).to.eql(6));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar movimientos del producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements?productId={{productId}}&order=desc&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": [
+                {
+                  "key": "productId",
+                  "value": "{{productId}}"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"2 movimientos\", () => pm.expect(pm.response.json().meta.totalItems).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtro de fechas invalido (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements?from=2026-12-31T00:00:00Z&to=2026-01-01T00:00:00Z",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-12-31T00:00:00Z"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-01-01T00:00:00Z"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = VALIDATION_ERROR\", () => pm.expect(pm.response.json().code).to.eql(\"VALIDATION_ERROR\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener movimiento OUT",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{movementOutId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{movementOutId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Reversiones",
+      "item": [
+        {
+          "name": "Revertir salida OUT (clave idemKeyReversal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKeyReversal}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{movementOutId}}/reversal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{movementOutId}}",
+                "reversal"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Venta anulada por el cliente - Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "const r = pm.response.json(); pm.environment.set(\"reversalId\", r.id);",
+                  "pm.test(\"IN 4 vinculado al original\", () => { pm.expect(r.type).to.eql(\"IN\"); pm.expect(r.quantity).to.eql(4); pm.expect(r.reversesMovementId).to.eql(pm.environment.get(\"movementOutId\")); });",
+                  "pm.test(\"stock vuelve a 10\", () => pm.expect(r.resultingStock).to.eql(10));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reintento de reversion con LA MISMA clave (replay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKeyReversal}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{movementOutId}}/reversal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{movementOutId}}",
+                "reversal"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Venta anulada por el cliente - Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"Idempotent-Replayed: true\", () => pm.expect(pm.response.headers.get(\"Idempotent-Replayed\")).to.eql(\"true\"));",
+                  "pm.test(\"mismo id\", () => pm.expect(pm.response.json().id).to.eql(pm.environment.get(\"reversalId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Segunda reversion con otra clave (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "pm-{{runId}}-rev-0002",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{movementOutId}}/reversal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{movementOutId}}",
+                "reversal"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Intento de doble reversion\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = MOVEMENT_ALREADY_REVERSED\", () => pm.expect(pm.response.json().code).to.eql(\"MOVEMENT_ALREADY_REVERSED\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revertir una compensacion (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "pm-{{runId}}-rev-0003",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{reversalId}}/reversal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{reversalId}}",
+                "reversal"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"No se puede revertir una reversion\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = MOVEMENT_IS_REVERSAL\", () => pm.expect(pm.response.json().code).to.eql(\"MOVEMENT_IS_REVERSAL\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revertir entrada IN dejaria stock negativo (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "pm-{{runId}}-rev-0004",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{movementInId}}/reversal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{movementInId}}",
+                "reversal"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Entrada registrada por error\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Antes: registrar una salida de 3 para que revertir la entrada de 10 deje stock negativo (10 - 3 = 7 < 10).",
+                  "pm.sendRequest({ url: pm.environment.get(\"baseUrl\") + \"/api/v1/movements\", method: \"POST\", header: { \"Content-Type\": \"application/json\", \"Idempotency-Key\": \"pm-\" + pm.environment.get(\"runId\") + \"-out-0003\" }, body: { mode: \"raw\", raw: JSON.stringify({ productId: pm.environment.get(\"productId\"), type: \"OUT\", quantity: 3, reason: \"Venta previa a la prueba de reversion\" }) } }, () => {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = INSUFFICIENT_STOCK\", () => pm.expect(pm.response.json().code).to.eql(\"INSUFFICIENT_STOCK\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle del OUT revertido (reversedByMovementId)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements/{{movementOutId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "{{movementOutId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"reversedByMovementId = reversalId\", () => pm.expect(pm.response.json().reversedByMovementId).to.eql(pm.environment.get(\"reversalId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Reportes",
+      "item": [
+        {
+          "name": "Stock bajo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/low-stock?page=1&limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "low-stock"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"solo activos con stock <= minimo\", () => pm.response.json().data.forEach(p => { pm.expect(p.isActive).to.eql(true); pm.expect(p.stock).to.be.at.most(p.minimumStock); }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reports/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "summary"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"campos del resumen\", () => { const b = pm.response.json(); [\"activeProducts\",\"totalUnits\",\"lowStockProducts\",\"categories\",\"generatedAt\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Gateway (CORS, rate limit, trazabilidad)",
+      "item": [
+        {
+          "name": "Preflight CORS origen permitido",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "{{origin}}",
+                "type": "text"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST",
+                "type": "text"
+              },
+              {
+                "key": "Access-Control-Request-Headers",
+                "value": "content-type, idempotency-key",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204\", () => pm.response.to.have.status(204));",
+                  "pm.test(\"Allow-Origin = origin\", () => pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.eql(pm.environment.get(\"origin\")));",
+                  "pm.test(\"Allow-Headers incluye Idempotency-Key\", () => pm.expect(pm.response.headers.get(\"Access-Control-Allow-Headers\")).to.include(\"Idempotency-Key\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preflight CORS origen NO permitido",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://evil.example",
+                "type": "text"
+              },
+              {
+                "key": "Access-Control-Request-Method",
+                "value": "POST",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"sin Allow-Origin\", () => pm.expect(pm.response.headers.get(\"Access-Control-Allow-Origin\")).to.be.oneOf([null, undefined, \"\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "X-Request-ID del cliente es reemplazado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "spoofed-request-id-123",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "live"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"id generado por el gateway\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.not.eql(\"spoofed-request-id-123\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rate limiting (rafaga de 60 -> al menos un 429)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories?limit=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Dispara 60 peticiones en paralelo antes de esta; al menos una debe recibir 429 (RATE_LIMIT_RPS=10, BURST=20).",
+                  "let done = 0, c429 = 0;",
+                  "const total = 60;",
+                  "for (let i = 0; i < total; i++) {",
+                  "  pm.sendRequest(pm.environment.get(\"baseUrl\") + \"/api/v1/categories?limit=1\", (err, res) => { if (res && res.code === 429) c429++; if (++done === total) pm.variables.set(\"count429\", c429); });",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Esta peticion responde 200 o 429\", () => pm.expect(pm.response.code).to.be.oneOf([200, 429]));",
+                  "pm.test(\"La rafaga previa produjo 429 (ver consola si falla: puede requerir reintentar)\", () => pm.expect(Number(pm.variables.get(\"count429\") || 0) + (pm.response.code === 429 ? 1 : 0)).to.be.above(0));",
+                  "if (pm.response.code === 429) pm.test(\"429 JSON con code RATE_LIMITED\", () => pm.expect(pm.response.json().code).to.eql(\"RATE_LIMITED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Baja logica y limpieza",
+      "item": [
+        {
+          "name": "Dar de baja producto con stock (409)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = PRODUCT_HAS_STOCK\", () => pm.expect(pm.response.json().code).to.eql(\"PRODUCT_HAS_STOCK\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salida del stock restante",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "pm-{{runId}}-cleanup",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"productId\":\"{{productId}}\",\"type\":\"OUT\",\"quantity\":{{remaining}},\"reason\":\"Limpieza final Postman\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.environment.get(\"baseUrl\") + \"/api/v1/products/\" + pm.environment.get(\"productId\"), (err, res) => { pm.variables.set(\"remaining\", res.json().stock); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 o ya sin stock\", () => pm.expect(pm.response.code).to.be.oneOf([201, 400]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dar de baja producto (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Producto inactivo consultable",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"isActive false\", () => pm.expect(pm.response.json().isActive).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Movimiento sobre producto inactivo (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "pm-{{runId}}-inactive",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/movements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"type\": \"IN\",\n  \"quantity\": 1,\n  \"reason\": \"No permitido\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = PRODUCT_INACTIVE\", () => pm.expect(pm.response.json().code).to.eql(\"PRODUCT_INACTIVE\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar inactivos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?status=inactive&search=pm-{{runId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "inactive"
+                },
+                {
+                  "key": "search",
+                  "value": "pm-{{runId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"aparece el producto inactivo\", () => pm.expect(pm.response.json().data.map(p => p.id)).to.include(pm.environment.get(\"productId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar categoria sigue bloqueado (409, historial)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}"
+              ],
+              "query": []
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"X-Request-ID presente\", () => pm.expect(pm.response.headers.get(\"X-Request-ID\")).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"code = CATEGORY_HAS_PRODUCTS\", () => pm.expect(pm.response.json().code).to.eql(\"CATEGORY_HAS_PRODUCTS\"));",
+                  "pm.test(\"Formato de error completo\", () => { const b = pm.response.json(); [\"statusCode\",\"code\",\"message\",\"timestamp\",\"path\",\"requestId\"].forEach(k => pm.expect(b).to.have.property(k)); });",
+                  "// Limpieza del entorno para permitir una nueva ejecucion completa",
+                  "pm.environment.unset(\"runId\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

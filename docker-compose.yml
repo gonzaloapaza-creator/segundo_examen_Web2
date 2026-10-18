@@ -1,0 +1,102 @@
+# StockGuard - orquestacion de demostracion local
+# Tres servicios permanentes: gateway (unico puerto publicado), backend y db.
+# Uso: cp .env.example .env && docker compose up --build -d
+#
+# Los nombres de contenedores y del volumen derivan de COMPOSE_PROJECT_NAME (por defecto `stockguard`),
+# de modo que se puede levantar una segunda instancia aislada (por ejemplo para probar un clon limpio) con:
+#   COMPOSE_PROJECT_NAME=sgclone GATEWAY_PORT=18080 docker compose up --build -d
+
+name: stockguard
+
+services:
+  gateway:
+    build:
+      context: ./gateway
+    image: stockguard/gateway:1.0.0
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard}-gateway
+    restart: unless-stopped
+    environment:
+      BACKEND_HOST: backend
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173|http://127.0.0.1:5173|http://localhost:8080}
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-10}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
+      CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-1m}
+      PROXY_READ_TIMEOUT: ${PROXY_READ_TIMEOUT:-30}
+      PROXY_CONNECT_TIMEOUT: ${PROXY_CONNECT_TIMEOUT:-5}
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - stockguard-net
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    image: stockguard/backend:1.0.0
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard}-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-log}
+      SEED_ON_START: ${SEED_ON_START:-true}
+      PAGINATION_MAX_LIMIT: ${PAGINATION_MAX_LIMIT:-100}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB en .env}
+    # Sin puertos publicados: solo accesible desde la red interna (a traves del Gateway).
+    expose:
+      - "${BACKEND_PORT:-3000}"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:${BACKEND_PORT:-3000}/api/v1/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    networks:
+      - stockguard-net
+
+  db:
+    image: postgres:16.15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-stockguard}-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB en .env}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    # Sin puertos publicados: solo accesible desde la red interna.
+    volumes:
+      - stockguard-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - stockguard-net
+
+networks:
+  stockguard-net:
+    driver: bridge
+
+volumes:
+  stockguard-pgdata:
+    # Volumen nombrado y persistente (sobrevive a `docker compose down`; solo `down -v` lo elimina).
+    name: ${COMPOSE_PROJECT_NAME:-stockguard}-pgdata
