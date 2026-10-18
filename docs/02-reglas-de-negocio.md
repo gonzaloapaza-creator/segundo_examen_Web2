@@ -25,7 +25,7 @@ Cada regla indica donde se aplica (codigo) y como se refuerza en PostgreSQL. Los
 | P8 | Rechazar la baja si el producto tiene existencias | mismo metodo, con `SELECT ... FOR UPDATE` | - | 409 `PRODUCT_HAS_STOCK` |
 | P9 | Listados muestran solo activos por defecto; filtro explicito `status=active|inactive|all` | `ListProductsQueryDto` | indice `(is_active, name)` | - |
 | P10 | Producto inactivo: `GET /products/{id}` lo devuelve (`isActive=false`); `PATCH` y `DELETE` responden 409; no admite movimientos | `ProductsService.assertActive`, `MovementsService.lockActiveProduct` | - | 409 `PRODUCT_INACTIVE` |
-| P11 | Reactivacion **no** disponible en la fase 1 (limitacion documentada) | - | - | - |
+| P11 | Reactivacion de productos dados de baja **no** disponible (limitacion documentada) | - | - | - |
 
 ## Movimientos
 

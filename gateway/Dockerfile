@@ -18,7 +18,7 @@ COPY templates/ /etc/nginx/templates/
 COPY snippets/ /etc/nginx/snippets/
 # Genera el mapa de origenes CORS escapando los puntos (se ejecuta antes del envsubst oficial, orden 20)
 COPY docker-entrypoint.d/15-cors-origins.sh /docker-entrypoint.d/15-cors-origins.sh
-# Placeholder estatico; en la fase 2 aqui se copiara el build de React/Vite
+# Pagina estatica de bienvenida con enlaces a Swagger, OpenAPI y salud
 COPY html/ /usr/share/nginx/html/
 
 RUN chmod +x /docker-entrypoint.d/15-cors-origins.sh && rm -f /etc/nginx/conf.d/default.conf

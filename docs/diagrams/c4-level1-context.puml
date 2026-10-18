@@ -1,15 +1,18 @@
 @startuml c4-level1-context
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-title StockGuard - Diagrama C4 Nivel 1 (Contexto) - Fase 1
+title StockGuard - Diagrama C4 Nivel 1 (Contexto del sistema)
 
-Person(operator, "Operador de tienda", "Encargado de inventario de la tienda de accesorios tecnologicos. Registra entradas/salidas y consulta stock.")
-Person(developer, "Desarrollador / Evaluador", "Explora la API con Swagger UI, Postman o cURL durante la demostracion local.")
+Person(operator, "Operador de tienda", "Encargado del inventario de una tienda de accesorios tecnologicos. Mantiene el catalogo, registra entradas/salidas y consulta stock y reportes.")
+Person(evaluator, "Evaluador / Desarrollador", "Revisa y prueba la API durante la demostracion local.")
 
-System(stockguard, "StockGuard", "API de control de inventario: catalogo (categorias y productos), movimientos auditables con idempotencia, reportes de stock bajo y resumen.")
+System(stockguard, "StockGuard", "API REST de control de inventario: catalogo (categorias y productos), movimientos auditables e inmutables con idempotencia y reversiones, reportes de stock bajo y resumen.")
 
-Rel(operator, stockguard, "Registra movimientos y consulta inventario", "HTTP/JSON via cliente REST (Postman, cURL). Frontend web previsto para la fase 2.")
-Rel(developer, stockguard, "Consulta documentacion y prueba endpoints", "HTTP: /docs (Swagger UI), /api/v1")
+System_Ext(clients, "Clientes HTTP de prueba", "Swagger UI (servida por el propio sistema), Postman y cURL. No existe un frontend propio.")
+
+Rel(operator, clients, "Opera el inventario mediante", "Swagger UI / Postman / cURL")
+Rel(evaluator, clients, "Explora la documentacion y ejecuta pruebas mediante")
+Rel(clients, stockguard, "Peticiones HTTP/JSON", "HTTP :8080 -> /api/v1, /docs, /health")
 
 SHOW_LEGEND()
 @enduml

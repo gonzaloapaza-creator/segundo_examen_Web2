@@ -1,10 +1,11 @@
-# StockGuard - API de control de inventario
+# StockGuard - API Gateway + microservicio de control de inventario
 
 **Autor:** Gonzalo Gabriel Apaza Ticona
 **Universidad:** Universidad Catolica Boliviana "San Pablo" - Tecnologias Web 2 (segundo parcial)
-**Fase:** 1 de 2 (backend + Gateway + base de datos). El frontend React/Vite y el informe PDF corresponden a la fase 2.
+**Alcance final:** Gateway Nginx + microservicio NestJS/TypeScript + PostgreSQL, orquestados con Docker Compose. **No incluye frontend**: la demostracion se realiza con Swagger UI, Postman y cURL a traves del Gateway.
 
-> Repositorio publico: <https://github.com/gonzaloapaza-creator/segundo_examen_Web2> (rama de integracion: `develop`).
+> Repositorio publico: <https://github.com/gonzaloapaza-creator/segundo_examen_Web2>
+> Rama de integracion (contiene todo el trabajo tecnico): `develop`. Rama estable `main`: **todavia no recibio el merge de `develop`** ni existe la etiqueta `v1.0.0` (verificado el 2026-10-17); ver la seccion 17 para el estado real y el PR de integracion preparado.
 
 ## Indice
 
@@ -15,17 +16,18 @@
 5. [Clonacion](#5-clonacion)
 6. [Configuracion (.env)](#6-configuracion-env)
 7. [Arranque desde cero](#7-arranque-desde-cero)
-8. [Swagger y OpenAPI](#8-swagger-y-openapi)
-9. [Migraciones y seed](#9-migraciones-y-seed)
-10. [Ejemplos cURL a traves del Gateway](#10-ejemplos-curl-a-traves-del-gateway)
-11. [Postman](#11-postman)
-12. [Pruebas](#12-pruebas)
-13. [Logs y salud](#13-logs-y-salud)
-14. [Persistencia, detencion y reinicio](#14-persistencia-detencion-y-reinicio)
-15. [Solucion de problemas](#15-solucion-de-problemas)
-16. [Flujo de ramas (Git Flow)](#16-flujo-de-ramas-git-flow)
-17. [Limitaciones de la fase 1](#17-limitaciones-de-la-fase-1)
-18. [Documentacion adicional](#18-documentacion-adicional)
+8. [Actualizar una instalacion existente](#8-actualizar-una-instalacion-existente)
+9. [Swagger, OpenAPI y salud](#9-swagger-openapi-y-salud)
+10. [Migraciones y seed](#10-migraciones-y-seed)
+11. [Ejemplos cURL a traves del Gateway](#11-ejemplos-curl-a-traves-del-gateway)
+12. [Postman](#12-postman)
+13. [Pruebas](#13-pruebas)
+14. [Logs y trazabilidad](#14-logs-y-trazabilidad)
+15. [Persistencia, detencion y reinicio](#15-persistencia-detencion-y-reinicio)
+16. [Solucion de problemas](#16-solucion-de-problemas)
+17. [Flujo de ramas (Git Flow)](#17-flujo-de-ramas-git-flow)
+18. [Limitaciones](#18-limitaciones)
+19. [Documentacion adicional](#19-documentacion-adicional)
 
 ## 1. Problema de negocio y alcance
 
@@ -33,19 +35,18 @@ Una pequena tienda de accesorios tecnologicos necesita controlar su catalogo y e
 
 StockGuard resuelve esto con:
 
-- **Categorias y productos** con CRUD; el stock **solo** cambia mediante movimientos.
-- **Movimientos de inventario** (`IN`/`OUT`) inmutables y auditables, con `previousStock`/`resultingStock` calculados en el servidor dentro de **una transaccion PostgreSQL con bloqueo de fila**.
-- **Reversiones** (movimientos compensatorios) vinculadas al original.
-- **Idempotencia** obligatoria (`Idempotency-Key`) persistida en PostgreSQL.
+- **Categorias y productos** con CRUD completo; el stock **solo** cambia mediante movimientos.
+- **Movimientos de inventario** (`IN`/`OUT`) como registros **inmutables y auditables** (sin PATCH/DELETE), con `previousStock`/`resultingStock` calculados en el servidor dentro de **una transaccion PostgreSQL con bloqueo de fila**. Las correcciones se hacen por **compensacion** (reversiones vinculadas al original).
+- **Idempotencia** obligatoria (`Idempotency-Key`) persistida en PostgreSQL: reintentar no duplica; reutilizar la clave con otro contenido da 409.
 - **Reportes** de stock bajo y resumen.
 - **Gateway Nginx** como unico punto de entrada con CORS, logs JSON, rate limiting y trazabilidad (`X-Request-ID`).
 
-Fuera de alcance en esta fase: frontend, autenticacion/roles, pagos/facturacion, multiples almacenes, notificaciones, Redis, despliegue publico.
+Fuera de alcance: frontend, autenticacion/roles, pagos/facturacion, multiples almacenes, notificaciones, Redis, despliegue publico.
 
 ## 2. Arquitectura
 
 ```
-Cliente (Postman / cURL / Swagger UI / futuro frontend)
+Cliente (Swagger UI / Postman / cURL)
         |  HTTP :8080  (unico puerto publicado)
         v
 +-----------------------+       HTTP :3000 (red interna)      +----------------------+     TCP :5432 (red interna)   +--------------------+
@@ -56,38 +57,41 @@ Cliente (Postman / cURL / Swagger UI / futuro frontend)
                        red bridge: stockguard-net (docker compose)
 ```
 
-Rutas publicas: `/api/v1/*` (API), `/docs` (Swagger UI), `/docs/openapi.json` y `/docs/openapi.yaml` (OpenAPI), `/health` (Nginx), `/api/v1/health/live|ready` (backend), `/` (placeholder estatico reservado para el frontend de la fase 2).
+Rutas publicas: `/api/v1/*` (API), `/docs` (Swagger UI), `/docs/openapi.json` y `/docs/openapi.yaml` (OpenAPI), `/health` (Nginx), `/api/v1/health/live|ready` (backend), `/` (pagina estatica de bienvenida con enlaces).
 
-Diagramas C4 editables (PlantUML) y exportados: [`docs/diagrams/`](docs/diagrams/).
+Diagramas C4 editables (PlantUML) y exportados: [`docs/diagrams/`](docs/diagrams/) (`c4-level1-context.*`, `c4-level2-containers.*`).
 
 Estructura del repositorio:
 
 ```
-backend/            microservicio NestJS (src/, test/, Dockerfile)
-gateway/            Nginx (Dockerfile, nginx.conf, templates/, snippets/, html/)
-docs/               dominio, reglas, endpoints, decisiones, guion, rubrica, evidencias, resultados, diagramas C4
-postman/            coleccion + entorno (y generador build-collection.js)
-scripts/            smoke-test.ps1 / smoke-test.sh
-docker-compose.yml  gateway + backend + db (demostracion)
-docker-compose.test.yml  PostgreSQL efimero + runner de pruebas de integracion
-.env.example        variables de entorno (copiar a .env)
+backend/                 microservicio NestJS (src/, test/, Dockerfile)
+gateway/                 Nginx (Dockerfile, nginx.conf, templates/, snippets/, html/)
+docs/                    dominio, reglas, endpoints, decisiones, guion, rubrica, resultados, base para el informe, guia de pruebas, diagramas C4
+postman/                 coleccion + entorno (y generador build-collection.js)
+scripts/                 smoke-test.ps1 / smoke-test.sh
+docker-compose.yml       gateway + backend + db (demostracion)
+docker-compose.test.yml  PostgreSQL efimero + runner de pruebas de integracion (sin puertos publicados)
+docker-compose.test.host.yml  override opcional que publica el PostgreSQL de pruebas en 127.0.0.1
+.env.example             variables de entorno (copiar a .env)
 ```
 
 ## 3. Tecnologias y versiones
 
+Versiones tomadas de `backend/package.json`, `backend/package-lock.json` y los Dockerfiles (sin etiquetas `latest`).
+
 | Componente | Version |
 | --- | --- |
 | Node.js | 22 LTS (`node:22.21.1-alpine`) |
-| NestJS | 11.2.7 (`@nestjs/common`, `core`, `platform-express`, `config` 4.0.4, `swagger` 11.4.7, `typeorm` 11.0.3) |
+| NestJS | 11.2.7 (`@nestjs/common`, `core`, `platform-express`; `@nestjs/config` 4.0.4; `@nestjs/swagger` 11.4.7; `@nestjs/typeorm` 11.0.3) |
 | TypeScript | 5.9.3 |
 | TypeORM / pg | 0.3.31 / 8.23.1 |
 | class-validator / class-transformer | 0.14.2 / 0.5.1 |
 | Jest / ts-jest / supertest | 30.5.2 / 29.4.14 / 7.3.1 |
 | PostgreSQL | 16.15 (`postgres:16.15-alpine`) |
 | Nginx | 1.28.2 (`nginx:1.28.2-alpine`) |
-| Docker Compose | v2+ (verificado con Docker Desktop, Engine 29.x, Compose v5.5) |
+| Docker / Compose | Docker Engine 29.8.2, Compose v5.5.1 (entorno donde se verifico; se requiere Compose v2 o superior) |
 
-Dependencias fijadas en `backend/package-lock.json` (instalacion con `npm ci`). Sin imagenes `latest`. Justificacion detallada en [`docs/04-decisiones-tecnicas.md`](docs/04-decisiones-tecnicas.md).
+Justificacion detallada en [`docs/04-decisiones-tecnicas.md`](docs/04-decisiones-tecnicas.md).
 
 ## 4. Requisitos
 
@@ -104,11 +108,11 @@ git clone -b develop https://github.com/gonzaloapaza-creator/segundo_examen_Web2
 cd stockguard
 ```
 
-(`-b develop` apunta a la rama de integracion con el trabajo de la fase 1; `main` quedara en la release de la fase 2.)
+`develop` es, a la fecha, la rama con todo el sistema integrado y funcional. `main` **aun no recibio ese merge** (solo tiene el commit inicial del repositorio) y no existe todavia la etiqueta `v1.0.0`; ver la seccion 17 para el estado real de las ramas y el plan de release.
 
 ## 6. Configuracion (.env)
 
-Copiar el ejemplo y, si se desea, ajustar valores. **Nunca** versionar `.env`.
+Solo en la **instalacion inicial**, copiar el ejemplo y, si se desea, ajustar valores. **Nunca** versionar `.env`.
 
 ```powershell
 # Windows PowerShell
@@ -123,7 +127,7 @@ cp .env.example .env
 | Variable | Por defecto | Descripcion |
 | --- | --- | --- |
 | `GATEWAY_PORT` | `8080` | Unico puerto publicado en el host |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173\|http://127.0.0.1:5173\|http://localhost:8080` | Origenes permitidos separados por `\|` (lista blanca exacta) |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173\|http://127.0.0.1:5173\|http://localhost:8080` | Origenes permitidos separados por `\|` (lista blanca exacta). `localhost:5173` es un origen de ejemplo para demostrar el preflight permitido |
 | `RATE_LIMIT_RPS` / `RATE_LIMIT_BURST` | `10` / `20` | Limite por IP (peticiones/segundo y rafaga) |
 | `CLIENT_MAX_BODY_SIZE` | `1m` | Tamano maximo del cuerpo |
 | `PROXY_READ_TIMEOUT` / `PROXY_CONNECT_TIMEOUT` | `30` / `5` | Segundos |
@@ -133,15 +137,17 @@ cp .env.example .env
 | `PAGINATION_MAX_LIMIT` | `100` | Limite maximo por pagina |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `stockguard` / `stockguard` / `change_me_local_only` | Credenciales **solo para demostracion local**; cambiarlas en `.env` |
 
+Opcional: `COMPOSE_PROJECT_NAME` (por defecto `stockguard`) define el prefijo de los contenedores (`stockguard-gateway`, `-backend`, `-db`) y del volumen (`stockguard-pgdata`). Permite levantar una segunda instancia aislada sin colisiones (ver seccion 13).
+
 ## 7. Arranque desde cero
 
 ```powershell
-Copy-Item .env.example .env
+Copy-Item .env.example .env        # solo la primera vez
 docker compose up --build -d
 docker compose ps
 ```
 
-Esperar hasta que los tres servicios muestren `(healthy)`:
+Esperar hasta que los tres servicios muestren `(healthy)` (el backend tarda unos 20-30 s: aplica migraciones y seed antes de aceptar trafico):
 
 ```
 NAME                 STATUS                   PORTS
@@ -150,47 +156,54 @@ stockguard-db        Up ... (healthy)         5432/tcp
 stockguard-gateway   Up ... (healthy)         0.0.0.0:8080->80/tcp
 ```
 
-Luego abrir **http://localhost:8080/docs**.
+Solo `stockguard-gateway` publica un puerto. Luego abrir **http://localhost:8080/docs**.
 
-URLs locales:
+## 8. Actualizar una instalacion existente
+
+Si ya se tiene el proyecto en marcha, **no** sobrescribir el `.env` (conserva credenciales y datos del volumen):
+
+```powershell
+git pull
+docker compose up --build -d      # reconstruye imagenes; conserva el volumen y los datos
+docker compose ps
+```
+
+Si `.env.example` incorporo variables nuevas, agregarlas manualmente al `.env` (todas tienen valor por defecto en `docker-compose.yml`, asi que no es obligatorio).
+
+## 9. Swagger, OpenAPI y salud
 
 | URL | Descripcion |
 | --- | --- |
-| http://localhost:8080/docs | Swagger UI |
-| http://localhost:8080/docs/openapi.json | OpenAPI JSON |
-| http://localhost:8080/health | Salud del Gateway |
-| http://localhost:8080/api/v1/health/ready | Salud del backend (verifica PostgreSQL) |
+| http://localhost:8080/docs | Swagger UI ("Try it out" envia las peticiones al mismo origen, es decir, al Gateway) |
+| http://localhost:8080/docs/openapi.json | OpenAPI 3 en JSON |
+| http://localhost:8080/docs/openapi.yaml | OpenAPI 3 en YAML |
+| http://localhost:8080/health | Salud del Gateway (Nginx, sin pasar por el backend) |
+| http://localhost:8080/api/v1/health/live | Liveness del backend |
+| http://localhost:8080/api/v1/health/ready | Readiness del backend (`SELECT 1` en PostgreSQL; **503** si la BD no responde) |
 | http://localhost:8080/api/v1/reports/summary | Resumen de inventario |
-| http://localhost:8080/ | Pagina de bienvenida (futuro frontend) |
+| http://localhost:8080/ | Pagina de bienvenida con enlaces |
 
-## 8. Swagger y OpenAPI
-
-- Swagger UI: `GET /docs` (las peticiones "Try it out" se envian al mismo origen, es decir, al Gateway).
-- OpenAPI 3: `GET /docs/openapi.json` y `GET /docs/openapi.yaml`.
-- Agrupado por modulo (Categorias, Productos, Movimientos, Reportes, Salud), con DTO, ejemplos, respuestas de error, filtros/paginacion y la cabecera `Idempotency-Key` documentada.
-
-Descargar la especificacion:
+Swagger esta agrupado por modulo (Categorias, Productos, Movimientos, Reportes, Salud) con DTO, ejemplos, respuestas de error, filtros/paginacion y la cabecera `Idempotency-Key` documentada.
 
 ```powershell
 curl.exe -s http://localhost:8080/docs/openapi.json -o openapi.json
 ```
 
-## 9. Migraciones y seed
+## 10. Migraciones y seed
 
 - Las migraciones (`backend/src/database/migrations/`) se ejecutan **automaticamente al arrancar el backend**, antes de aceptar trafico. Si fallan, el contenedor termina con error (visible en `docker compose logs backend`) y no pasa a `healthy`.
-- `synchronize` esta deshabilitado.
-- Seed de demostracion (5 categorias, 11 productos con stock normal, bajo y cero, 9 entradas iniciales): se ejecuta al arrancar si `SEED_ON_START=true`. Es **idempotente**: repetirlo no duplica datos ni modifica stock cambiado por el usuario (las entradas iniciales usan claves de idempotencia `seed-initial-<SKU>`).
-
-Ejecutar el seed manualmente dentro de Docker:
+- `synchronize` esta deshabilitado: el esquema solo cambia por migraciones versionadas.
+- Seed de demostracion (5 categorias, 11 productos con stock normal, bajo y cero, 9 entradas iniciales): se ejecuta al arrancar si `SEED_ON_START=true`. Es **idempotente**: repetirlo no duplica datos ni modifica stock cambiado por el usuario (las entradas iniciales usan claves de idempotencia `seed-initial-<SKU>`; en arranques posteriores el log muestra `movementsReplayed: 9`).
 
 ```powershell
+# Ejecutar el seed manualmente dentro de Docker
 docker compose exec backend node dist/database/seed/run-seed.js
-```
 
-Ver migraciones aplicadas:
-
-```powershell
+# Ver migraciones aplicadas
 docker compose exec db psql -U stockguard -d stockguard -c "SELECT * FROM typeorm_migrations"
+
+# Ver restricciones de la tabla de movimientos
+docker compose exec db psql -U stockguard -d stockguard -c "\d inventory_movements"
 ```
 
 Desarrollo fuera de Docker (opcional, requiere Node.js y un PostgreSQL accesible; ver `backend/.env.example`):
@@ -199,60 +212,76 @@ Desarrollo fuera de Docker (opcional, requiere Node.js y un PostgreSQL accesible
 cd backend
 npm ci
 Copy-Item .env.example .env   # ajustar POSTGRES_*
-npm run migration:run         # o simplemente npm run start:dev (ejecuta migraciones al arrancar)
-npm run start:dev
+npm run start:dev             # ejecuta migraciones al arrancar
 ```
 
-## 10. Ejemplos cURL a traves del Gateway
+## 11. Ejemplos cURL a traves del Gateway
 
-En **Windows PowerShell** usar `curl.exe` (el alias `curl` apunta a `Invoke-WebRequest`). En Linux/macOS/Git Bash usar `curl` y comillas simples.
+### Windows PowerShell
+
+Usar `curl.exe` (el alias `curl` apunta a `Invoke-WebRequest`). **Importante:** en PowerShell los cuerpos JSON escritos en linea con `\"` **no** llegan bien a `curl.exe`; la forma fiable (verificada en Windows PowerShell 5.1) es escribir el JSON en un archivo con `Set-Content -Encoding ASCII` y enviarlo con `-d "@archivo"`. Dentro de una cadena PowerShell con comillas dobles, las comillas del JSON se escriben duplicadas (`""`).
 
 ```powershell
-# Crear categoria
-curl.exe -i -X POST http://localhost:8080/api/v1/categories -H "Content-Type: application/json" -d "{\"name\":\"Gaming\",\"description\":\"Perifericos gamer\"}"
+$B = "http://localhost:8080/api/v1"
 
-# Listar productos activos con busqueda y paginacion
-curl.exe -s "http://localhost:8080/api/v1/products?search=usb&page=1&limit=5&sortBy=name&order=asc"
+# 1) Crear categoria
+'{"name":"Gaming","description":"Perifericos gamer"}' | Set-Content -Encoding ASCII body.json
+curl.exe -i -X POST "$B/categories" -H "Content-Type: application/json" -d "@body.json"
+# Copiar el "id" de la respuesta:
+$C = "<categoryId>"
 
-# Crear producto (nace con stock 0; stock NO se acepta en el body)
-curl.exe -i -X POST http://localhost:8080/api/v1/products -H "Content-Type: application/json" -d "{\"sku\":\"mou-gm-01\",\"name\":\"Mouse gamer\",\"referencePrice\":\"129.90\",\"minimumStock\":3,\"categoryId\":\"<categoryId>\"}"
+# 2) Crear producto (nace con stock 0; "stock" NO se acepta en el body)
+"{""sku"":""mou-gm-01"",""name"":""Mouse gamer"",""referencePrice"":""129.90"",""minimumStock"":3,""categoryId"":""$C""}" | Set-Content -Encoding ASCII body.json
+curl.exe -i -X POST "$B/products" -H "Content-Type: application/json" -d "@body.json"
+$P = "<productId>"
 
-# Entrada de inventario (Idempotency-Key obligatoria)
-curl.exe -i -X POST http://localhost:8080/api/v1/movements -H "Content-Type: application/json" -H "Idempotency-Key: compra-2026-0001" -d "{\"productId\":\"<productId>\",\"type\":\"IN\",\"quantity\":10,\"reason\":\"Compra a proveedor\"}"
+# 3) Listar productos activos con busqueda y paginacion
+curl.exe -s "$B/products?search=mouse&page=1&limit=5&sortBy=name&order=asc"
 
-# Reintento con la MISMA clave -> misma respuesta, Idempotent-Replayed: true, stock sin cambios
-curl.exe -i -X POST http://localhost:8080/api/v1/movements -H "Content-Type: application/json" -H "Idempotency-Key: compra-2026-0001" -d "{\"productId\":\"<productId>\",\"type\":\"IN\",\"quantity\":10,\"reason\":\"Compra a proveedor\"}"
+# 4) Entrada de inventario (Idempotency-Key obligatoria)
+"{""productId"":""$P"",""type"":""IN"",""quantity"":10,""reason"":""Compra a proveedor""}" | Set-Content -Encoding ASCII body.json
+curl.exe -i -X POST "$B/movements" -H "Content-Type: application/json" -H "Idempotency-Key: compra-2026-0001" -d "@body.json"
 
-# Salida
-curl.exe -i -X POST http://localhost:8080/api/v1/movements -H "Content-Type: application/json" -H "Idempotency-Key: venta-2026-0001" -d "{\"productId\":\"<productId>\",\"type\":\"OUT\",\"quantity\":4,\"reason\":\"Venta mostrador\"}"
+# 5) Reintento con la MISMA clave y el mismo cuerpo -> 201, Idempotent-Replayed: true, mismo id, stock sin cambios
+curl.exe -i -X POST "$B/movements" -H "Content-Type: application/json" -H "Idempotency-Key: compra-2026-0001" -d "@body.json"
 
-# Reversion de un movimiento
-curl.exe -i -X POST http://localhost:8080/api/v1/movements/<movementId>/reversal -H "Content-Type: application/json" -H "Idempotency-Key: rev-2026-0001" -d "{\"reason\":\"Venta anulada\"}"
+# 6) Salida
+"{""productId"":""$P"",""type"":""OUT"",""quantity"":4,""reason"":""Venta mostrador""}" | Set-Content -Encoding ASCII body.json
+curl.exe -i -X POST "$B/movements" -H "Content-Type: application/json" -H "Idempotency-Key: venta-2026-0001" -d "@body.json"
+$M = "<movementId de la salida>"
 
-# Movimientos de un producto en un rango de fechas
-curl.exe -s "http://localhost:8080/api/v1/movements?productId=<productId>&type=OUT&from=2026-10-01T00:00:00Z&to=2026-10-31T23:59:59Z"
+# 7) Reversion (compensacion) de la salida
+'{"reason":"Venta anulada"}' | Set-Content -Encoding ASCII body.json
+curl.exe -i -X POST "$B/movements/$M/reversal" -H "Content-Type: application/json" -H "Idempotency-Key: rev-2026-0001" -d "@body.json"
 
-# Reportes
-curl.exe -s http://localhost:8080/api/v1/reports/low-stock
-curl.exe -s http://localhost:8080/api/v1/reports/summary
+# 8) Historial del producto, reportes
+curl.exe -s "$B/movements?productId=$P&order=desc"
+curl.exe -s "$B/reports/low-stock"
+curl.exe -s "$B/reports/summary"
 
-# Baja logica (solo con stock 0)
-curl.exe -i -X DELETE http://localhost:8080/api/v1/products/<productId>
+# 9) Baja logica (solo con stock 0)
+curl.exe -i -X DELETE "$B/products/$P"
 
-# CORS preflight
-curl.exe -i -X OPTIONS http://localhost:8080/api/v1/movements -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type, idempotency-key"
+# 10) CORS preflight (origen permitido)
+curl.exe -i -X OPTIONS "$B/movements" -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type, idempotency-key"
 ```
 
-Equivalente bash del movimiento:
+### Linux / macOS / Git Bash
 
 ```bash
-curl -i -X POST http://localhost:8080/api/v1/movements -H 'Content-Type: application/json' -H 'Idempotency-Key: compra-2026-0001' \
+B=http://localhost:8080/api/v1
+curl -i -X POST $B/categories -H 'Content-Type: application/json' -d '{"name":"Gaming","description":"Perifericos gamer"}'
+curl -i -X POST $B/products -H 'Content-Type: application/json' \
+  -d '{"sku":"mou-gm-01","name":"Mouse gamer","referencePrice":"129.90","minimumStock":3,"categoryId":"<categoryId>"}'
+curl -i -X POST $B/movements -H 'Content-Type: application/json' -H 'Idempotency-Key: compra-2026-0001' \
   -d '{"productId":"<productId>","type":"IN","quantity":10,"reason":"Compra a proveedor"}'
+curl -i -X POST $B/movements/<movementId>/reversal -H 'Content-Type: application/json' -H 'Idempotency-Key: rev-2026-0001' \
+  -d '{"reason":"Venta anulada"}'
 ```
 
-Tabla completa de endpoints y codigos de error: [`docs/03-endpoints.md`](docs/03-endpoints.md).
+Tabla completa de endpoints y codigos de error: [`docs/03-endpoints.md`](docs/03-endpoints.md). Secuencia completa de pruebas manuales: [`docs/GUIA_PRUEBAS_Y_CAPTURAS.md`](docs/GUIA_PRUEBAS_Y_CAPTURAS.md).
 
-## 11. Postman
+## 12. Postman
 
 1. Importar `postman/StockGuard.postman_collection.json` y `postman/StockGuard.postman_environment.json`.
 2. Seleccionar el entorno **StockGuard - Local (Gateway)** (`baseUrl = http://localhost:8080`).
@@ -260,7 +289,7 @@ Tabla completa de endpoints y codigos de error: [`docs/03-endpoints.md`](docs/03
 
 La coleccion captura automaticamente `categoryId`, `productId`, `movementInId`, `movementOutId` y `reversalId`. Las claves de idempotencia (`idemKeyIn`, `idemKeyOut`, `idemKeyReversal`) se generan **una sola vez por ejecucion** y las peticiones de reintento las **reutilizan deliberadamente** para demostrar el replay y el conflicto 409. La ultima peticion limpia `runId` para permitir una nueva ejecucion.
 
-Ejecucion por linea de comandos (opcional):
+Ejecucion por linea de comandos (opcional, requiere Node.js):
 
 ```powershell
 npx newman@6 run postman/StockGuard.postman_collection.json -e postman/StockGuard.postman_environment.json
@@ -268,32 +297,37 @@ npx newman@6 run postman/StockGuard.postman_collection.json -e postman/StockGuar
 
 La coleccion se genera desde `postman/build-collection.js` (`node postman/build-collection.js`).
 
-## 12. Pruebas
+## 13. Pruebas
 
 ### Pruebas automatizadas (unitarias + integracion con PostgreSQL real)
 
-Dentro de Docker (recomendado; no requiere Node.js en el host). Usa una base de datos **efimera y separada** (`stockguard_test`):
+Dentro de Docker (recomendado; no requiere Node.js en el host ni puertos publicados). Usa un PostgreSQL **efimero y separado** (`stockguard_test`, credenciales propias, red interna):
 
 ```powershell
 docker compose -f docker-compose.test.yml run --rm --build backend-test
 docker compose -f docker-compose.test.yml down -v
 ```
 
-Desde el host (requiere Node.js >= 22). El PostgreSQL de pruebas de `docker-compose.test.yml` queda publicado en `127.0.0.1:55432` (configurable con `TEST_DB_PORT`; en ese caso exportar tambien `TEST_POSTGRES_PORT` con el mismo valor):
+El comando devuelve el codigo de salida de Jest (0 = todo pasa). Resultado esperado: `Test Suites: 5 passed, Tests: 35 passed`.
+
+Desde el host (opcional, requiere Node.js >= 22). Publicar el PostgreSQL de pruebas en loopback con el override:
 
 ```powershell
-docker compose -f docker-compose.test.yml up -d db-test
+docker compose -f docker-compose.test.yml -f docker-compose.test.host.yml up -d db-test
 cd backend
 npm ci
-$env:TEST_POSTGRES_PASSWORD = "test_only_password"
 npm test                     # unitarias + integracion
 npm run test:integration     # solo integracion
 npm run test:unit            # solo unitarias
+cd ..
+docker compose -f docker-compose.test.yml -f docker-compose.test.host.yml down -v
 ```
 
-> **Advertencia (destructivo):** las pruebas de integracion **TRUNCAN** las tablas de la base de datos de pruebas (`TEST_POSTGRES_DB`, por defecto `stockguard_test`). El helper de pruebas aborta si el nombre de la BD no contiene `test`. Nunca apuntarlas al volumen de demostracion.
+Si `55432` esta reservado en Windows, elegir otro puerto antes de levantar `db-test`: `$env:TEST_DB_PORT = "56432"; $env:TEST_POSTGRES_PORT = "56432"`.
 
-Cobertura funcional de las pruebas: CRUD y restricciones de unicidad, validaciones, baja logica, bloqueo de eliminacion de categorias, entradas/salidas, stock insuficiente, transaccion revertida ante fallo, **dos salidas simultaneas por la ultima unidad**, reintentos idempotentes secuenciales y **simultaneos**, misma clave con contenido distinto, reversiones (valida, doble, de compensacion, stock insuficiente, concurrente), reportes, salud y seed idempotente.
+> **Advertencia (destructivo):** las pruebas de integracion **TRUNCAN** las tablas de la base de datos de pruebas. Protecciones: `test/setup-env.ts` ignora las variables `POSTGRES_*` del `.env` de demostracion y solo usa `TEST_POSTGRES_*` (por defecto el contenedor `db-test`); `test/test-app.ts` aborta si `NODE_ENV != test`, si el nombre de la BD no termina en `_test` o si la BD realmente conectada (`current_database()`) no coincide con la configurada. Nunca apuntarlas al volumen de demostracion.
+
+Cobertura funcional: CRUD y restricciones de unicidad, validaciones, baja logica, bloqueo de eliminacion de categorias, entradas/salidas, stock insuficiente, transaccion revertida ante fallo, **dos salidas simultaneas por la ultima unidad**, reintentos idempotentes secuenciales y **simultaneos**, misma clave con contenido distinto, reversiones (valida, doble, de compensacion, stock insuficiente, concurrente), reportes, salud y seed idempotente.
 
 ### Smoke test del sistema completo (a traves del Gateway)
 
@@ -305,24 +339,30 @@ Cobertura funcional de las pruebas: CRUD y restricciones de unicidad, validacion
 bash scripts/smoke-test.sh            # Git Bash / Linux / macOS
 ```
 
-Verifica salud, Swagger, CRUD, validaciones, idempotencia, concurrencia (dos salidas simultaneas), reversion, reportes, CORS y rate limiting (29 comprobaciones). Crea datos con prefijo `SMOKE-<timestamp>` y da de baja el producto al final; **no** borra datos de demostracion.
+Verifica salud, Swagger, CRUD, validaciones, idempotencia, concurrencia (dos salidas simultaneas), reversion, reportes, CORS y rate limiting (29 comprobaciones; codigo de salida 1 si alguna falla). Crea datos con prefijo `SMOKE-<timestamp>` y da de baja el producto al final; **no** borra datos de demostracion.
 
-Resultados reales obtenidos: [`docs/08-resultados-verificacion.md`](docs/08-resultados-verificacion.md).
+### Segunda instancia aislada (por ejemplo, validar un clon limpio)
 
-## 13. Logs y salud
+```powershell
+$env:COMPOSE_PROJECT_NAME = "sgclone"; $env:GATEWAY_PORT = "18080"
+docker compose up --build -d          # contenedores sgclone-*, volumen sgclone-pgdata, puerto 18080
+docker compose down -v                # elimina SOLO la instancia sgclone
+Remove-Item Env:COMPOSE_PROJECT_NAME, Env:GATEWAY_PORT
+```
+
+Resultados reales de todas las verificaciones: [`docs/08-resultados-verificacion.md`](docs/08-resultados-verificacion.md).
+
+## 14. Logs y trazabilidad
 
 ```powershell
 docker compose ps                                   # estado y healthchecks
 docker compose logs -f gateway                      # logs JSON de Nginx (time, request_id, method, path, status, duration_ms, upstream_status)
 docker compose logs -f backend                      # logs del backend (JSON por peticion con requestId)
 docker compose logs --no-log-prefix gateway | Select-String "<requestId>"   # correlacionar por X-Request-ID
+docker compose logs --no-log-prefix backend | Select-String "<requestId>"
 ```
 
-Salud:
-
-- `GET /health` -> Nginx.
-- `GET /api/v1/health/live` -> proceso del backend.
-- `GET /api/v1/health/ready` -> `SELECT 1` en PostgreSQL; responde **503** si la BD no esta disponible (probar con `docker compose stop db`).
+Los logs **no** contienen cuerpos ni cabeceras sensibles; solo metodo, ruta (sin query string), estado, duracion y `requestId`. El Gateway genera `X-Request-ID` en cada peticion (reemplaza cualquier valor enviado por el cliente), lo devuelve al cliente y lo propaga al backend, que lo incluye en su log y en todos los errores JSON.
 
 Rate limiting: la respuesta `429` es JSON (`code: RATE_LIMITED`). Para observarlo en Windows hay que enviar las peticiones por una sola conexion (lanzar 60 procesos `curl.exe` separados no alcanza 10 req/s):
 
@@ -331,19 +371,19 @@ $u = 1..60 | ForEach-Object { "-o"; "NUL"; "http://localhost:8080/api/v1/categor
 curl.exe -s -w "%{http_code}`n" @u | Sort-Object | Group-Object | Select-Object Name, Count
 ```
 
-## 14. Persistencia, detencion y reinicio
+## 15. Persistencia, detencion y reinicio
 
 | Accion | Comando | Efecto sobre los datos |
 | --- | --- | --- |
 | Detener contenedores | `docker compose stop` | Datos conservados (volumen y contenedores) |
 | Reanudar | `docker compose start` | - |
 | Eliminar contenedores y red | `docker compose down` | **Datos conservados** en el volumen `stockguard-pgdata` |
-| Recrear desde cero las imagenes | `docker compose up --build -d` | Datos conservados; migraciones ya aplicadas se omiten; seed reproduce sin duplicar |
+| Recrear las imagenes | `docker compose up --build -d` | Datos conservados; migraciones ya aplicadas se omiten; seed reproduce sin duplicar |
 | Eliminar tambien el volumen | `docker compose down -v` | **Se pierden todos los datos** (destructivo). El siguiente `up` migra y siembra de nuevo |
 
-Verificacion de persistencia realizada: tras `docker compose down` + `docker compose up -d`, las categorias y movimientos creados durante las pruebas seguian presentes y el seed reporto `movementsReplayed: 9` (ver `docs/08-resultados-verificacion.md`).
+Verificacion realizada: tras `docker compose down` + `docker compose up -d`, `GET /api/v1/reports/summary` devolvio los mismos valores y el backend registro `Esquema al dia` y `movementsReplayed: 9` (ver `docs/08-resultados-verificacion.md`).
 
-## 15. Solucion de problemas
+## 16. Solucion de problemas
 
 | Sintoma | Causa probable | Solucion |
 | --- | --- | --- |
@@ -351,61 +391,66 @@ Verificacion de persistencia realizada: tras `docker compose down` + `docker com
 | `port is already allocated` en 8080 | Otro proceso usa el puerto | Cambiar `GATEWAY_PORT` en `.env` y volver a `docker compose up -d` |
 | `backend` no llega a `healthy` | Migracion fallida o BD no lista | `docker compose logs backend`; verificar credenciales; `docker compose down -v` solo si se acepta perder datos |
 | Swagger no carga en `/docs` | Backend aun arrancando | Esperar a `healthy`; `docker compose ps` |
-| 503 `SERVICE_UNAVAILABLE` en todas las rutas `/api/v1` | Backend caido o reiniciando (`resolver` de Nginx) | `docker compose ps`, `docker compose logs backend` |
+| 503 `SERVICE_UNAVAILABLE` en todas las rutas `/api/v1` | Backend caido o reiniciando | `docker compose ps`, `docker compose logs backend` |
+| 503 solo en `/api/v1/health/ready` | PostgreSQL detenido | `docker compose start db` |
 | 429 durante la demo | Rate limiting | Esperar unos segundos o subir `RATE_LIMIT_RPS`/`RATE_LIMIT_BURST` en `.env` y `docker compose up -d gateway` |
-| El navegador bloquea peticiones desde otro origen | Origen no esta en `CORS_ALLOWED_ORIGINS` | Agregarlo (separado por `\|`) y recrear el gateway |
-| `curl` en PowerShell muestra errores raros | Alias de `Invoke-WebRequest` | Usar `curl.exe` |
-| Las pruebas de integracion fallan con `ECONNREFUSED` | No hay PostgreSQL de pruebas | `docker compose -f docker-compose.test.yml up -d db-test` o usar el runner en Docker |
-| `ports are not available: ... 127.0.0.1:55432 ... forbidden by its access permissions` al levantar `db-test` | Windows reservo ese puerto (ver `netsh interface ipv4 show excludedportrange protocol=tcp`) | Usar otro puerto: `$env:TEST_DB_PORT = "56432"` (PowerShell) o `TEST_DB_PORT=56432` (bash) antes del comando; si se ejecutan las pruebas desde el host, fijar tambien `TEST_POSTGRES_PORT` al mismo valor |
+| El navegador bloquea peticiones desde otro origen | Origen no esta en `CORS_ALLOWED_ORIGINS` | Agregarlo (separado por `\|`) y `docker compose up -d gateway` |
+| `curl` en PowerShell muestra errores raros o `400` con "Expected property name" | Alias de `Invoke-WebRequest` o comillas del JSON | Usar `curl.exe` y enviar el JSON desde archivo (`-d "@body.json"`), ver seccion 11 |
+| Las pruebas de integracion fallan con `ECONNREFUSED` | No hay PostgreSQL de pruebas | Usar el runner en Docker o levantar `db-test` con el override `docker-compose.test.host.yml` |
+| `ports are not available: ... 127.0.0.1:55432 ... forbidden by its access permissions` | Windows reservo ese puerto (ver `netsh interface ipv4 show excludedportrange protocol=tcp`) | No hace falta el puerto para el runner en Docker. Para pruebas desde el host usar otro: `$env:TEST_DB_PORT = "56432"; $env:TEST_POSTGRES_PORT = "56432"` |
+| `Proteccion de BD de pruebas: ...` al ejecutar Jest | La conexion no apunta a una BD `_test` | Revisar `TEST_POSTGRES_*`; nunca apuntar a la BD de demostracion |
 | `npm ci` falla por version de Node | Node < 22 | Instalar Node 22 LTS o usar solo Docker |
 | Cambios en `.env` no se aplican | Contenedores ya creados | `docker compose up -d` (recrea los afectados) |
 
-## 16. Flujo de ramas (Git Flow)
+## 17. Flujo de ramas (Git Flow)
 
-- `main`: versiones estables (sin release todavia; la fase 2 cerrara la 1.0).
-- `develop`: integracion continua de las funcionalidades.
-- `feature/*`: una rama por bloque funcional, integradas en `develop` con merge `--no-ff`.
+- `main`: versiones estables (`v1.0.0` = version tecnica del sistema, **pendiente de publicar**).
+- `develop`: integracion continua.
+- `feature/*` y `fix/*`: una rama por bloque funcional o correccion, integradas en `develop` mediante merge `--no-ff` o Pull Request.
+- `release/*`: preparacion de la version estable, fusionada en `main` (etiqueta) y de vuelta en `develop`.
 
-Ramas y commits creados en esta fase:
-
-| Rama | Commits principales |
+| Rama | Contenido principal |
 | --- | --- |
-| `feature/backend-foundation` | `feat: scaffold NestJS backend with config, TypeORM migrations and error handling`, `feat: add category and product CRUD`, `feat: add transactional inventory movements with idempotency and reversals`, `feat: add idempotent demo seed`, `test: verify inventory concurrency, idempotency and catalog rules against PostgreSQL`, `build: add multi-stage backend Dockerfile` |
-| `feature/gateway` | `feat: configure gateway controls (CORS, structured logs, rate limiting, request id)`, `build: add container orchestration with healthchecks and test runner`, `test: add end-to-end smoke tests through the gateway` |
-| `feature/docs` | `docs: add Postman collection and environment with idempotency flows`, `docs: document API and local setup` |
-| `fix/line-endings` | `fix: enforce LF line endings for container scripts and configs` (hallado al probar un clon limpio en Windows) |
+| `feature/backend-foundation` | Scaffold NestJS, configuracion, migraciones, CRUD, movimientos transaccionales con idempotencia y reversiones, seed, pruebas de integracion, Dockerfile multi-etapa |
+| `feature/gateway` | Nginx (CORS, logs JSON, rate limiting, X-Request-ID), Docker Compose con healthchecks y runner de pruebas, smoke tests |
+| `feature/docs` | Coleccion Postman, documentacion inicial |
+| `fix/line-endings` | `.gitattributes` con LF (hallado al probar un clon limpio en Windows) |
+| `fix/tsconfig-forward-compat` | `moduleResolution node16` y puerto de BD de pruebas configurable |
+| `feature/cierre-tecnico` | Cierre final: alcance sin frontend, entorno de pruebas aislado, nombres de Compose parametrizables, `requestId` en errores de JSON malformado, README/docs/C4 definitivos, base para el informe y guia de pruebas |
+| `release/1.0.0` | **Pendiente de crear**: preparacion de la version estable, a cortar desde `develop` una vez fusionado `feature/cierre-tecnico` |
 
-| `fix/tsconfig-forward-compat` | `fix: use node16 module resolution and configurable test db port` |
+### Estado real verificado el 2026-10-17 (no asumir lo contrario)
 
-Repositorio remoto publico: <https://github.com/gonzaloapaza-creator/segundo_examen_Web2>. Todas las ramas anteriores estan publicadas (`origin`); el historial de integracion queda en los merges `--no-ff` hacia `develop`, visibles con `git log --graph --oneline develop`.
+- `main` solo contiene el commit inicial del repositorio (`chore: initialize repository structure`); **no** tiene el codigo de `backend/`, `gateway/` ni la documentacion, y **no** existe todavia la etiqueta `v1.0.0`.
+- `develop` si contiene todo el trabajo integrado (`feature/backend-foundation`, `feature/gateway`, `feature/docs`, `fix/line-endings`, `fix/tsconfig-forward-compat`), fusionado con merges `--no-ff`.
+- `feature/cierre-tecnico` esta un commit por delante de `develop` y fue publicada en `origin`.
+- Hay un Pull Request abierto (`#1`, `feature/gateway` -> `main`) creado automaticamente por GitHub al publicar esa rama; **no refleja el estado actual** (quedo desactualizado antes de `feature/docs`, los `fix/*` y `feature/cierre-tecnico`) y no debe fusionarse tal cual.
+- Pull Request preparado como parte de este cierre: `feature/cierre-tecnico` -> `develop`. Falta que un revisor lo apruebe y lo fusione (Git Flow + proteccion de rama de `develop`).
+- Una vez fusionado ese PR, el siguiente paso es cortar `release/1.0.0` desde `develop`, abrir un Pull Request `release/1.0.0` -> `main`, y tras su aprobacion y merge, etiquetar `v1.0.0` en `main` y fusionar de vuelta en `develop`. Ese paso **no se hizo todavia**.
 
-## 17. Limitaciones de la fase 1
+Historial: `git log --oneline --graph --all`.
+
+## 18. Limitaciones
 
 - Sin autenticacion ni autorizacion: **solo para demostracion local**; no desplegar publicamente tal cual. CORS es una politica del navegador y **no** sustituye la autenticacion.
-- Sin frontend (ruta `/` reservada; el build de React/Vite se servira como estaticos desde Nginx en la fase 2).
-- No hay reactivacion de productos dados de baja ni borrado fisico.
-- Un solo almacen; sin costos ni valorizacion de inventario (el precio es referencial).
+- Sin frontend propio: los clientes son Swagger UI, Postman y cURL (decision de alcance del examen).
+- No hay reactivacion de productos dados de baja ni borrado fisico de productos.
+- Un solo almacen; sin costos ni valorizacion de inventario (el precio es referencial y se maneja como cadena decimal).
 - HTTP sin TLS.
-- Sin release `1.0` ni informe PDF (fase 2).
+- El rate limiting es por IP de socket; detras de otro proxy todos los clientes compartirian el limite.
+- El registro de idempotencia no caduca (no hay limpieza periodica de `idempotency_records`).
 
-### Preparacion para la fase 2 (frontend)
-
-- Nginx ya sirve `/` desde `/usr/share/nginx/html` con `try_files ... /index.html` (enrutado SPA). Bastara copiar el build de Vite a esa ruta en el `Dockerfile` del gateway (o un servicio `frontend` de build).
-- `CORS_ALLOWED_ORIGINS` incluye `http://localhost:5173` para el servidor de desarrollo de Vite; en produccion local el frontend se servira desde el mismo origen (8080), sin CORS.
-- Cabeceras expuestas al navegador: `X-Request-ID`, `Idempotent-Replayed`. Cabecera permitida: `Idempotency-Key`.
-- OpenAPI en `/docs/openapi.json` permite generar el cliente TypeScript del frontend.
-- Respuestas paginadas uniformes `{ data, meta }` y errores uniformes `{ statusCode, code, message, details, requestId }`.
-
-## 18. Documentacion adicional
+## 19. Documentacion adicional
 
 | Documento | Contenido |
 | --- | --- |
+| [`docs/BASE_PARA_INFORME.md`](docs/BASE_PARA_INFORME.md) | Base tecnica completa para redactar el informe (arquitectura, modelo de datos, implementacion, pruebas, rubrica) |
+| [`docs/GUIA_PRUEBAS_Y_CAPTURAS.md`](docs/GUIA_PRUEBAS_Y_CAPTURAS.md) | Secuencia paso a paso de pruebas manuales y capturas (PowerShell, Swagger, Postman) |
 | [`docs/01-dominio.md`](docs/01-dominio.md) | Problema, entidades, glosario |
 | [`docs/02-reglas-de-negocio.md`](docs/02-reglas-de-negocio.md) | Reglas, codigos de error, idempotencia, concurrencia |
 | [`docs/03-endpoints.md`](docs/03-endpoints.md) | Tabla de endpoints y cabeceras |
 | [`docs/04-decisiones-tecnicas.md`](docs/04-decisiones-tecnicas.md) | Versiones y justificacion tecnica |
-| [`docs/05-guion-demostracion.md`](docs/05-guion-demostracion.md) | Guion paso a paso para la defensa |
+| [`docs/05-guion-demostracion.md`](docs/05-guion-demostracion.md) | Guion resumido para la defensa |
 | [`docs/06-matriz-rubrica.md`](docs/06-matriz-rubrica.md) | Cumplimiento de la rubrica |
-| [`docs/07-evidencias-para-el-informe.md`](docs/07-evidencias-para-el-informe.md) | Capturas a tomar para el PDF |
-| [`docs/08-resultados-verificacion.md`](docs/08-resultados-verificacion.md) | Resultados reales de las verificaciones |
+| [`docs/08-resultados-verificacion.md`](docs/08-resultados-verificacion.md) | Resultados reales de las verificaciones tecnicas |
 | [`docs/diagrams/`](docs/diagrams/) | C4 nivel 1 y 2 (PlantUML + PNG/SVG) |

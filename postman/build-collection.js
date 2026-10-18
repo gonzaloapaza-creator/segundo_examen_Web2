@@ -30,7 +30,7 @@ const errCode = (status, code) => [
 const collection = {
   info: {
     _postman_id: 'b7f2c9e1-4d35-4a8e-8f61-9c0d1e2f3a4b',
-    name: 'StockGuard API (fase 1)',
+    name: 'StockGuard API',
     description:
       'Coleccion de StockGuard a traves del Gateway Nginx ({{baseUrl}}).\n\n' +
       'Ejecutar las carpetas en orden (Runner o manualmente). Los IDs creados se guardan en el entorno.\n' +

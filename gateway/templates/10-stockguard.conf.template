@@ -59,9 +59,9 @@ server {
         proxy_pass $backend_upstream;
     }
 
-    # ---------------- Frontend (fase 2) ----------------
-    # Hoy sirve una pagina estatica de bienvenida. En la fase 2 se copiara el build de
-    # React/Vite a /usr/share/nginx/html y try_files mantendra el enrutado SPA.
+    # ---------------- Pagina de bienvenida ----------------
+    # Pagina estatica con enlaces a Swagger, OpenAPI y salud. El sistema no incluye frontend:
+    # los clientes son Swagger UI, Postman y cURL.
     location / {
         root /usr/share/nginx/html;
         index index.html;

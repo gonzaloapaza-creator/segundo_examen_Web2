@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "b7f2c9e1-4d35-4a8e-8f61-9c0d1e2f3a4b",
-    "name": "StockGuard API (fase 1)",
+    "name": "StockGuard API",
     "description": "Coleccion de StockGuard a traves del Gateway Nginx ({{baseUrl}}).\n\nEjecutar las carpetas en orden (Runner o manualmente). Los IDs creados se guardan en el entorno.\nLas pruebas de idempotencia reutilizan DELIBERADAMENTE la misma clave (variables idemKey*), generada una sola vez por ejecucion (runId).\n\nAutor: Gonzalo Gabriel Apaza Ticona - UCB \"San Pablo\".",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
