@@ -100,8 +100,25 @@ Corrige a las afirmaciones anteriores de este documento y de `README.md`/`docs/B
 
 | Pendiente | Tipo | Motivo | Como completarlo |
 | --- | --- | --- | --- |
-| Pull Request `feature/cierre-tecnico` -> `develop` | Tecnico (no es tarea del estudiante) | Preparado en este cierre; falta revision/aprobacion humana | Revisar y fusionar en GitHub (merge `--no-ff` o "Squash and merge" segun la convencion del repositorio) |
-| Crear `release/1.0.0` desde `develop` y Pull Request hacia `main` | Tecnico (no es tarea del estudiante) | Depende de que se fusione el punto anterior; no se ejecuto porque requiere una decision humana sobre el momento de publicar la version estable | Tras el merge a `develop`: `git checkout -b release/1.0.0 develop`, publicar la rama y abrir el PR hacia `main`; al aprobarlo, etiquetar `v1.0.0` y fusionar de vuelta en `develop` |
+| Fusionar el PR `#2` (`feature/cierre-tecnico` -> `develop`) | Tecnico (no es tarea del estudiante) | El PR ya fue creado (<https://github.com/gonzaloapaza-creator/segundo_examen_Web2/pull/2>, `mergeable_state: clean`, sin checks ni revisiones obligatorias detectadas); falta completarlo en este mismo cierre | Ver seccion 10 para el resultado de la integracion |
+| Crear `release/1.0.0` desde `develop` y Pull Request hacia `main` | Tecnico (no es tarea del estudiante) | Depende de que se fusione el punto anterior | Ver seccion 10 |
 | Captura de evidencias e informe PDF | Estudiante | Corresponde al estudiante, con `docs/GUIA_PRUEBAS_Y_CAPTURAS.md` | Seguir la guia y tomar las capturas indicadas |
 | Ejecucion en un equipo distinto desde un clon limpio | Estudiante/opcional | Solo se verifico en este equipo (ver seccion 5b para el clon limpio ya realizado) | Seguir README > Arranque desde cero |
 | Prueba en PowerShell 7 | Estudiante/opcional | Solo se ejecuto el smoke test en Windows PowerShell 5.1 (el script contempla ambos) | `pwsh .\scripts\smoke-test.ps1` |
+
+## 9. Reverificacion de la version candidata a integrar (2026-10-18)
+
+Commit evaluado: `c7248b9` (rama `feature/cierre-tecnico`, identico al `head` del PR `#2`). Entorno: misma maquina Windows, Docker Desktop (Engine 29.8.2, Compose v5.5.1), PowerShell 5.1. Se preservaron los codigos de salida reales de cada comando (sin `grep`/`tail` que los oculten).
+
+| Verificacion | Comando | Resultado |
+| --- | --- | --- |
+| Type-check | `npm run typecheck` (en `backend/`) | exit `0`, sin errores |
+| Build | `npm run build` (en `backend/`) | exit `0` |
+| Pruebas unitarias + integracion en Docker | `docker compose -f docker-compose.test.yml run --rm --build backend-test` | exit `0`; `Test Suites: 5 passed, 5 total`; `Tests: 35 passed, 35 total` (35.3 s); limpiado despues con `docker compose -f docker-compose.test.yml down -v` (solo el proyecto `stockguard-test`) |
+| Smoke test contra la demostracion en ejecucion | `.\scripts\smoke-test.ps1` | exit `0`; `29 OK, 0 FAIL`; `docker ps`/`docker volume ls` confirmaron `stockguard-gateway/backend/db` y `stockguard-pgdata` sin cambios antes y despues |
+| Swagger y servicios de la demostracion | `curl.exe http://localhost:8080/docs` y `/docs/openapi.json` -> 200; `docker compose ps` | los tres servicios `(healthy)`, solo `stockguard-gateway` con puerto publicado |
+| **Clon limpio aislado desde `origin/feature/cierre-tecnico`** (proyecto Compose, puerto y volumen propios, sin tocar la demostracion) | `git clone -b feature/cierre-tecnico <remoto> $env:TEMP\sg-clone-verify`; `Copy-Item .env.example .env`; `$env:COMPOSE_PROJECT_NAME="sgclone"; $env:GATEWAY_PORT="18080"; docker compose up --build -d` | Contenedores `sgclone-db/backend/gateway` y volumen `sgclone-pgdata` (sin colisionar con `stockguard-*`); los tres alcanzaron `(healthy)`; log: `Migraciones aplicadas: InitialSchema1760000000000`, `Seed completado: {"categoriesCreated":5,"productsCreated":11,"movementsCreated":9,"movementsReplayed":0}` |
+| Swagger y operacion de negocio end-to-end en el clon aislado | `curl.exe http://localhost:18080/docs` -> 200; `POST /categories` -> 201; `POST /products` -> 201 (`stock:0`, SKU normalizado `CC-TEST-01`); `POST /movements` con `Idempotency-Key: cc-verify-0001` -> 201 (`previousStock:0`, `resultingStock:7`, `Idempotent-Replayed:false`) | Flujo completo (categoria -> producto -> movimiento IN) correcto a traves del Gateway en un clon recien descargado |
+| Limpieza del clon | `docker compose down -v` (solo el proyecto `sgclone`) + borrado de la carpeta temporal | `stockguard-*`/`stockguard-pgdata` sin cambios (verificado con `docker ps`) |
+
+Conclusion: la version candidata (`c7248b9`) arranca, migra, siembra y responde correctamente desde un clon limpio, de forma aislada de la instancia de demostracion del usuario.
