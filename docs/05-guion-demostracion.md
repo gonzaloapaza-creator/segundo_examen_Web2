@@ -120,5 +120,5 @@ curl.exe -s "$B/reports/summary"   # comparar activeProducts/totalUnits/lowStock
 
 ## 9. Cierre
 
-- Mostrar `git log --oneline --graph --all` (ramas `develop`, `feature/*`, `fix/*` integradas con merge `--no-ff`; `main` aun sin el merge de `develop` ni la etiqueta `v1.0.0`, ver README seccion 17 para el estado real).
+- Mostrar `git log --oneline --graph --all` (Git Flow: `main`, `develop`, `feature/*`, `fix/*`, `release/1.0.0`, etiqueta `v1.0.0`; ver README seccion 17 para el detalle).
 - Mostrar `docs/diagrams/export/*.png` (C4 nivel 1 y 2).

@@ -9,7 +9,7 @@ Guia paso a paso para que el estudiante ejecute las pruebas manuales desde **Win
 ### 0.1 Requisitos
 
 - Docker Desktop en ejecucion.
-- Repositorio clonado (`git clone -b develop https://github.com/gonzaloapaza-creator/segundo_examen_Web2.git stockguard`; **a la fecha `main` no tiene el codigo del proyecto**, ver README seccion 17) o la copia de trabajo habitual actualizada (`git pull`).
+- Repositorio clonado (`git clone -b main https://github.com/gonzaloapaza-creator/segundo_examen_Web2.git stockguard`) o la copia de trabajo habitual actualizada (`git pull`).
 - `.env` existente (si es una instalacion nueva: `Copy-Item .env.example .env`). **No** sobrescribir un `.env` existente.
 - Stack levantado: `docker compose up --build -d` y los tres servicios en `(healthy)`.
 - Carpeta para las capturas (no versionada): `mkdir docs\evidencias`.
@@ -381,7 +381,7 @@ git log --oneline --graph --all --decorate | Select-Object -First 40
 git tag
 ```
 
-- **Resultado esperado:** ramas `develop`, `feature/*`, `fix/*` con los merges de integracion `--no-ff`. **No** asumir que `main` tiene la etiqueta `v1.0.0` ni que existe `release/1.0.0`: verificarlo en el momento con `git log --oneline main` y `git tag`; si todavia no se fusiono la release, el grafo de `main` mostrara solo el commit inicial (ver README seccion 17 para el estado real y el PR de integracion).
+- **Resultado esperado:** ramas `main`, `develop`, `feature/*`, `fix/*`, `release/1.0.0` con los merges de integracion `--no-ff` y la etiqueta `v1.0.0` sobre `main`. Verificar siempre en el momento con `git log --oneline main` y `git tag` (no asumir el resultado sin ejecutarlo): ver README seccion 17 para el detalle y los enlaces a los Pull Requests.
 - **Captura:** el grafo. **Archivo:** `E22-git-flow.png`. Tambien una captura del repositorio en GitHub (pagina principal y pestana de Pull Requests).
 - **Rubrica:** Git Flow y repositorio publico.
 
